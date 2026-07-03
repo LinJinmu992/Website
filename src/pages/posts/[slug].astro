@@ -1,0 +1,50 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { posts } from '../../data/posts';
+
+export function getStaticPaths() {
+	return posts.map((post) => ({ params: { slug: post.slug }, props: { post } }));
+}
+
+const { post } = Astro.props;
+---
+
+<Layout title={`${post.title} · 林衿慕`} description={post.description}>
+	<article class="post">
+		<header>
+			<a class="back" href="/">← 返回文章</a>
+			<h1>{post.title}</h1>
+			<div class="meta">
+				<time datetime={post.date}>{post.date.replaceAll('-', ' / ')}</time>
+				<span>{post.readTime}阅读</span>
+			</div>
+		</header>
+		<div class="prose">
+			{post.content.map((paragraph) => <p>{paragraph}</p>)}
+		</div>
+		<footer class="post-end">
+			<span>完</span>
+			<a href="/">继续看看其他文章 →</a>
+		</footer>
+	</article>
+</Layout>
+
+<style>
+	.post { padding-top: 34px; }
+	.post header { padding: 24px 0 54px; border-bottom: 1px solid var(--line); }
+	.back { color: var(--muted); font-size: 12px; }
+	h1 { max-width: 590px; margin: 46px 0 22px; font-size: clamp(34px, 7vw, 48px); font-weight: 500; letter-spacing: -.025em; }
+	.meta { display: flex; gap: 18px; color: var(--faint); font-size: 11px; }
+	.prose { padding: 52px 0 34px; font-family: ui-serif, "Songti SC", "STSong", serif; font-size: 18px; line-height: 2.05; }
+	.prose p { margin: 0 0 1.65em; }
+	.prose p:first-child::first-letter { float: left; margin: .05em .12em 0 0; color: var(--accent); font-size: 3em; line-height: .9; }
+	.post-end { display: flex; justify-content: space-between; padding: 25px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+	.post-end span { color: var(--accent); }
+	.post-end a:hover { color: var(--text); }
+	@media (max-width: 560px) {
+		.post { padding-top: 10px; }
+		.post header { padding-bottom: 44px; }
+		h1 { margin-top: 38px; }
+		.prose { font-size: 17px; }
+	}
+</style>

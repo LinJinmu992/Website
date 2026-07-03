@@ -1,0 +1,31 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="关于 · 林衿慕">
+	<article class="about">
+		<p class="eyebrow">About</p>
+		<h1>一个普通人的<br />数字小屋。</h1>
+		<div class="prose">
+			<p>你好，我是林衿慕，一名设计师和业余写作者。白天与屏幕打交道，晚上读书、散步，偶尔认真观察一朵云。</p>
+			<p>这个博客用来存放那些不适合被压缩成一句话的想法。更新没有固定频率，但每一篇都会认真写。</p>
+			<p>如果你愿意聊聊，可以写信给我：<a href="mailto:hello@example.com">hello@example.com</a></p>
+		</div>
+		<aside>
+			<span>此刻</span>
+			<p>住在南方，正在学习做面包，读一本很厚的小说。</p>
+		</aside>
+	</article>
+</Layout>
+
+<style>
+	.about { padding-top: 58px; }
+	h1 { margin: 0 0 65px; font-size: clamp(34px, 6vw, 44px); font-weight: 500; letter-spacing: -.02em; }
+	.prose { max-width: 570px; font-family: ui-serif, "Songti SC", "STSong", serif; font-size: 17px; line-height: 2; }
+	.prose p { margin: 0 0 1.4em; }
+	.prose a { color: var(--accent); border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+	aside { display: grid; grid-template-columns: 70px 1fr; margin-top: 64px; padding: 22px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+	aside span { color: var(--faint); }
+	aside p { margin: 0; }
+	@media (max-width: 560px) { .about { padding-top: 42px; } }
+</style>
