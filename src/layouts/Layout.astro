@@ -1,23 +1,329 @@
+---
+interface Props {
+	title?: string;
+	description?: string;
+}
+
+const {
+	title = '林衿慕 · 个人博客',
+	description = '关于设计、技术与日常的安静记录。',
+} = Astro.props;
+
+const pathname = Astro.url.pathname;
+const nav = [
+	{ href: '/', label: '文章' },
+	{ href: '/archive', label: '归档' },
+	{ href: '/about', label: '关于' },
+];
+---
+
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content={description} />
+		<meta name="theme-color" content="#f7f6f2" />
+		<link rel="icon" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Astro Basics</title>
+		<title>{title}</title>
+		<script is:inline>
+			const saved = localStorage.getItem('theme');
+			const dark = saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches);
+			document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+		</script>
 	</head>
 	<body>
-		<slot />
+		<div class="meteor-sky" aria-hidden="true">
+			<i style="--x: 84%; --y: 8%; --delay: 1s; --duration: 8s; --color: #79c7ff"></i>
+			<i style="--x: 68%; --y: 20%; --delay: 5.5s; --duration: 11s; --color: #d49cff"></i>
+			<i style="--x: 94%; --y: 32%; --delay: 9s; --duration: 9s; --color: #79e6c0"></i>
+			<i style="--x: 48%; --y: 45%; --delay: 13s; --duration: 12s; --color: #ffad8a"></i>
+			<i style="--x: 32%; --y: 58%; --delay: 17s; --duration: 10s; --color: #ffe18a"></i>
+			<i style="--x: 61%; --y: 5%; --delay: 3.2s; --duration: 13s; --color: #ff8fa8"></i>
+			<i style="--x: 98%; --y: 16%; --delay: 7.4s; --duration: 12s; --color: #8ca8ff"></i>
+			<i style="--x: 79%; --y: 27%; --delay: 11.8s; --duration: 8.5s; --color: #9df0e2"></i>
+			<i style="--x: 91%; --y: 41%; --delay: 15.6s; --duration: 14s; --color: #f6a8ff"></i>
+			<i style="--x: 57%; --y: 55%; --delay: 20.5s; --duration: 11.5s; --color: #ffca80"></i>
+			<i style="--x: 27%; --y: 70%; --delay: 23s; --duration: 9.5s; --color: #7fd6ff"></i>
+			<i style="--x: 44%; --y: 82%; --delay: 26.8s; --duration: 13.5s; --color: #a6e98f"></i>
+			<i style="--x: 73%; --y: 2%; --delay: 2.1s; --duration: 9.2s; --color: #b7a2ff"></i>
+			<i style="--x: 91%; --y: 11%; --delay: 4.6s; --duration: 12.8s; --color: #72e3d1"></i>
+			<i style="--x: 80%; --y: 18%; --delay: 6.3s; --duration: 8.8s; --color: #ff9f86"></i>
+			<i style="--x: 99%; --y: 25%; --delay: 8.7s; --duration: 14.5s; --color: #9ac5ff"></i>
+			<i style="--x: 72%; --y: 34%; --delay: 10.2s; --duration: 10.4s; --color: #f4cf78"></i>
+			<i style="--x: 87%; --y: 39%; --delay: 12.9s; --duration: 9.8s; --color: #df98ff"></i>
+			<i style="--x: 18%; --y: 48%; --delay: 14.4s; --duration: 13.2s; --color: #75d9ff"></i>
+			<i style="--x: 72%; --y: 52%; --delay: 16.7s; --duration: 8.6s; --color: #ff91bc"></i>
+			<i style="--x: 39%; --y: 64%; --delay: 18.9s; --duration: 11.2s; --color: #8ce6a4"></i>
+			<i style="--x: 62%; --y: 73%; --delay: 21.4s; --duration: 12.4s; --color: #ffb987"></i>
+			<i style="--x: 22%; --y: 79%; --delay: 24.2s; --duration: 9.4s; --color: #86b5ff"></i>
+			<i style="--x: 51%; --y: 88%; --delay: 27.6s; --duration: 13.8s; --color: #d6a1ff"></i>
+		</div>
+		<div class="page">
+			<header class="site-header">
+				<a class="site-name" href="/" aria-label="返回首页">林衿慕<span class="dot">。</span></a>
+				<div class="header-right">
+					<nav aria-label="主导航">
+						{nav.map((item) => (
+							<a href={item.href} aria-current={pathname === item.href ? 'page' : undefined}>
+								{item.label}
+							</a>
+						))}
+					</nav>
+					<button class="theme-toggle" type="button" aria-label="切换明暗主题">
+						<svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+						<svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/></svg>
+					</button>
+				</div>
+			</header>
+
+			<main><slot /></main>
+
+			<footer>
+				<p>© {new Date().getFullYear()} 林衿慕</p>
+				<p class="footer-note">慢一点，也没关系。</p>
+			</footer>
+		</div>
+		<script>
+			const button = document.querySelector<HTMLButtonElement>('.theme-toggle');
+			button?.addEventListener('click', () => {
+				const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+				document.documentElement.dataset.theme = next;
+				localStorage.setItem('theme', next);
+			});
+		</script>
 	</body>
 </html>
 
-<style>
-	html,
+<style is:global>
+	:root {
+		--bg: #f7f6f2;
+		--text: #22221f;
+		--muted: #77756e;
+		--faint: #aaa79e;
+		--line: #dedcd4;
+		--accent: #b65039;
+		color-scheme: light;
+	}
+
+	:root[data-theme='dark'] {
+		--bg: #1c1c1a;
+		--text: #e8e6df;
+		--muted: #a4a198;
+		--faint: #747169;
+		--line: #373632;
+		--accent: #d9785f;
+		color-scheme: dark;
+	}
+
+	* { box-sizing: border-box; }
+
+	html {
+		background: var(--bg);
+		scroll-behavior: smooth;
+	}
+
 	body {
 		margin: 0;
-		width: 100%;
-		height: 100%;
+		background: var(--bg);
+		color: var(--text);
+		font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+		font-size: 16px;
+		line-height: 1.75;
+		-webkit-font-smoothing: antialiased;
+		transition: background-color .25s ease, color .25s ease;
+	}
+
+	.meteor-sky {
+		position: fixed;
+		inset: 0;
+		z-index: 0;
+		overflow: hidden;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity .6s ease;
+	}
+
+	[data-theme='dark'] .meteor-sky { opacity: 1; }
+
+	.meteor-sky i {
+		position: absolute;
+		top: var(--y);
+		left: var(--x);
+		width: 68px;
+		height: 2px;
+		border-radius: 999px;
+		background: linear-gradient(90deg, var(--color), color-mix(in srgb, var(--color) 45%, transparent) 42%, transparent);
+		filter: drop-shadow(0 0 3px color-mix(in srgb, var(--color) 70%, transparent));
+		opacity: 0;
+		transform: rotate(-38deg);
+		animation: meteor var(--duration) var(--delay) infinite ease-in;
+	}
+
+	@keyframes meteor {
+		0%, 78% {
+			opacity: 0;
+			transform: translate3d(0, 0, 0) rotate(-38deg);
+		}
+		80% { opacity: .72; }
+		88% {
+			opacity: 0;
+			transform: translate3d(-140px, 108px, 0) rotate(-38deg);
+		}
+		100% { opacity: 0; }
+	}
+
+	::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+
+	a { color: inherit; text-decoration: none; }
+
+	.page {
+		position: relative;
+		z-index: 1;
+		width: min(100% - 40px, 680px);
+		min-height: 100vh;
+		margin: 0 auto;
+		display: flex;
+		flex-direction: column;
+		transition: width .65s cubic-bezier(.22, .72, .24, 1);
+	}
+
+	@media (min-width: 900px) {
+		.page.reading-mode { width: min(100% - 64px, 1120px); }
+	}
+
+	.site-header {
+		height: 132px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.site-name {
+		font-family: ui-serif, "Songti SC", "STSong", serif;
+		font-weight: 700;
+		font-size: 21px;
+		letter-spacing: .04em;
+	}
+
+	.dot { color: var(--accent); }
+	.header-right, nav { display: flex; align-items: center; }
+	.header-right { gap: 25px; }
+	nav { gap: 24px; }
+
+	nav a {
+		color: var(--muted);
+		font-size: 14px;
+		transition: color .2s ease;
+	}
+
+	nav a:hover, nav a[aria-current='page'] { color: var(--text); }
+
+	.theme-toggle {
+		width: 27px;
+		height: 27px;
+		padding: 5px;
+		border: 0;
+		border-radius: 50%;
+		color: var(--muted);
+		background: transparent;
+		cursor: pointer;
+	}
+
+	.theme-toggle:hover { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+	.theme-toggle svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+	.moon { display: none; }
+	[data-theme='dark'] .sun { display: none; }
+	[data-theme='dark'] .moon { display: block; }
+
+	main { flex: 1; }
+
+	.eyebrow {
+		margin: 0 0 14px;
+		color: var(--accent);
+		font-size: 12px;
+		font-weight: 600;
+		letter-spacing: .14em;
+		text-transform: uppercase;
+	}
+
+	h1, h2, h3 {
+		font-family: ui-serif, "Songti SC", "STSong", serif;
+		line-height: 1.35;
+		text-wrap: balance;
+	}
+
+	footer {
+		display: flex;
+		justify-content: space-between;
+		padding: 76px 0 32px;
+		color: var(--faint);
+		font-size: 12px;
+	}
+
+	footer p { margin: 0; }
+
+	@media (prefers-reduced-motion: no-preference) {
+		.site-name,
+		.header-right,
+		main .eyebrow,
+		main h1,
+		main .intro-note,
+		main .lead,
+		main .section-head,
+		main .post-list article,
+		main .year,
+		main .prose,
+		main aside,
+		main .meta,
+		main .post-end,
+		.page > footer {
+			opacity: 0;
+			animation: reveal-up .72s cubic-bezier(.22, .72, .24, 1) forwards;
+		}
+
+		.site-name { animation-delay: .04s; }
+		.header-right { animation-delay: .1s; }
+		main .eyebrow { animation-delay: .12s; }
+		main h1 { animation-delay: .2s; }
+		main .intro-note,
+		main .lead,
+		main .meta { animation-delay: .3s; }
+		main .section-head,
+		main .prose { animation-delay: .38s; }
+		main .post-list article:nth-child(1),
+		main .year,
+		main aside { animation-delay: .46s; }
+		main .post-list article:nth-child(2) { animation-delay: .54s; }
+		main .post-list article:nth-child(3),
+		main .post-end { animation-delay: .62s; }
+		.page > footer { animation-delay: .72s; }
+	}
+
+	@keyframes reveal-up {
+		from {
+			opacity: 0;
+			transform: translate3d(0, 10px, 0);
+		}
+		to {
+			opacity: 1;
+			transform: translate3d(0, 0, 0);
+		}
+	}
+
+	@media (max-width: 560px) {
+		.page { width: min(100% - 32px, 680px); }
+		.site-header { height: 104px; }
+		.header-right { gap: 14px; }
+		nav { gap: 16px; }
+		nav a { font-size: 13px; }
+		.footer-note { display: none; }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		html { scroll-behavior: auto; }
+		*, *::before, *::after { transition-duration: .01ms !important; }
+		.meteor-sky { display: none; }
 	}
 </style>
