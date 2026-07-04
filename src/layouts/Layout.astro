@@ -1,4 +1,7 @@
 ---
+import '@fontsource-variable/noto-sans-sc/wght.css';
+import '@fontsource-variable/noto-serif-sc/wght.css';
+
 interface Props {
 	title?: string;
 	description?: string;
@@ -11,7 +14,8 @@ const {
 
 const pathname = Astro.url.pathname;
 const nav = [
-	{ href: '/', label: '文章' },
+	{ href: '/', label: '首页' },
+	{ href: '/articles', label: '文章' },
 	{ href: '/archive', label: '归档' },
 	{ href: '/about', label: '关于' },
 ];
@@ -62,11 +66,19 @@ const nav = [
 		</div>
 		<div class="page">
 			<header class="site-header">
-				<a class="site-name" href="/" aria-label="返回首页">林衿慕<span class="dot">。</span></a>
+				<a class="site-name" href="/" aria-label="返回首页">LinJinmu<span class="dot">.</span></a>
 				<div class="header-right">
 					<nav aria-label="主导航">
 						{nav.map((item) => (
-							<a href={item.href} aria-current={pathname === item.href ? 'page' : undefined}>
+							<a
+								href={item.href}
+								aria-current={
+									pathname === item.href ||
+									(item.href === '/articles' && pathname.startsWith('/posts/'))
+										? 'page'
+										: undefined
+								}
+							>
 								{item.label}
 							</a>
 						))}
@@ -87,11 +99,31 @@ const nav = [
 		</div>
 		<script>
 			const button = document.querySelector<HTMLButtonElement>('.theme-toggle');
+			const meteorSky = document.querySelector<HTMLElement>('.meteor-sky');
+			let meteorWakeTimer = 0;
+
+			const wakeMeteors = () => {
+				if (!meteorSky) return;
+				meteorSky.classList.remove('is-starting');
+				void meteorSky.offsetWidth;
+				meteorSky.classList.add('is-starting');
+				window.clearTimeout(meteorWakeTimer);
+				meteorWakeTimer = window.setTimeout(() => {
+					meteorSky.classList.remove('is-starting');
+				}, 1300);
+			};
+
 			button?.addEventListener('click', () => {
 				const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
 				document.documentElement.dataset.theme = next;
 				localStorage.setItem('theme', next);
+				if (next === 'dark') wakeMeteors();
+				else meteorSky?.classList.remove('is-starting');
 			});
+
+			if (document.documentElement.dataset.theme === 'dark') {
+				window.requestAnimationFrame(wakeMeteors);
+			}
 		</script>
 	</body>
 </html>
@@ -104,6 +136,8 @@ const nav = [
 		--faint: #aaa79e;
 		--line: #dedcd4;
 		--accent: #b65039;
+		--font-sans: "Noto Sans SC Variable", "Noto Sans SC", sans-serif;
+		--font-serif: "Noto Serif SC Variable", "Noto Serif SC", serif;
 		color-scheme: light;
 	}
 
@@ -128,7 +162,7 @@ const nav = [
 		margin: 0;
 		background: var(--bg);
 		color: var(--text);
-		font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+		font-family: var(--font-sans);
 		font-size: 16px;
 		line-height: 1.75;
 		-webkit-font-smoothing: antialiased;
@@ -158,7 +192,27 @@ const nav = [
 		filter: drop-shadow(0 0 3px color-mix(in srgb, var(--color) 70%, transparent));
 		opacity: 0;
 		transform: rotate(-38deg);
-		animation: meteor var(--duration) var(--delay) infinite ease-in;
+		animation: meteor var(--duration) calc(var(--delay) * -1) infinite ease-in;
+	}
+
+	[data-theme='dark'] .meteor-sky.is-starting i:nth-child(1) {
+		animation: meteor-burst .9s 0s both ease-out;
+	}
+
+	[data-theme='dark'] .meteor-sky.is-starting i:nth-child(2) {
+		animation: meteor-burst 1s .12s both ease-out;
+	}
+
+	@keyframes meteor-burst {
+		0% {
+			opacity: 0;
+			transform: translate3d(0, 0, 0) rotate(-38deg);
+		}
+		12% { opacity: .78; }
+		100% {
+			opacity: 0;
+			transform: translate3d(-140px, 108px, 0) rotate(-38deg);
+		}
 	}
 
 	@keyframes meteor {
@@ -201,7 +255,7 @@ const nav = [
 	}
 
 	.site-name {
-		font-family: ui-serif, "Songti SC", "STSong", serif;
+		font-family: var(--font-serif);
 		font-weight: 700;
 		font-size: 21px;
 		letter-spacing: .04em;
@@ -249,7 +303,7 @@ const nav = [
 	}
 
 	h1, h2, h3 {
-		font-family: ui-serif, "Songti SC", "STSong", serif;
+		font-family: var(--font-serif);
 		line-height: 1.35;
 		text-wrap: balance;
 	}
@@ -292,11 +346,9 @@ const nav = [
 		main .meta { animation-delay: .3s; }
 		main .section-head,
 		main .prose { animation-delay: .38s; }
-		main .post-list article:nth-child(1),
 		main .year,
 		main aside { animation-delay: .46s; }
-		main .post-list article:nth-child(2) { animation-delay: .54s; }
-		main .post-list article:nth-child(3),
+		main .post-list article { animation-delay: var(--reveal-delay, .46s); }
 		main .post-end { animation-delay: .62s; }
 		.page > footer { animation-delay: .72s; }
 	}
