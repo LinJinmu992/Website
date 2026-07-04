@@ -1,43 +1,32 @@
-export const posts = [
-	{
-		slug: 'the-shape-of-quiet',
-		title: '安静也有自己的形状',
-		date: '2026-06-28',
-		displayDate: '06 · 28',
-		description: '一次删掉多余元素的练习，以及留白为什么不是“什么都没有”。',
-		readTime: '4 分钟',
-		content: [
-			'最近重新整理这个博客时，我给自己定了一个很简单的规则：每加入一个元素，都要说得清它为什么应该在这里。',
-			'于是很多东西消失了。醒目的横幅、层层叠叠的卡片、总想吸引注意力的按钮。页面安静下来之后，文字反而有了更清晰的轮廓。',
-			'留白不是空缺。它更像一句话里的停顿，让前后的意思各自站稳。好的界面也一样：不急着把每一寸空间用完，而是给阅读留下呼吸。',
-			'克制并不等于冷淡。真正的简洁，应该让人感到被照顾——知道从哪里开始，也知道可以慢慢看。',
-		],
-	},
-	{
-		slug: 'walking-without-navigation',
-		title: '没有导航的一次散步',
-		date: '2026-06-12',
-		displayDate: '06 · 12',
-		description: '关掉地图，在熟悉的城市里重新迷路。',
-		readTime: '3 分钟',
-		content: [
-			'周日下午，我把手机放进口袋，沿着一条从没走到底的小路继续往前。',
-			'没有目的地的时候，城市会显露出另一套尺度。转角的树影、旧楼阳台上的花、巷子里慢吞吞的猫，都不再只是地图上被略过的背景。',
-			'我们太习惯知道下一步了。可偶尔不做最优选择，反而会遇见一些无法被推荐算法提前安排的东西。',
-		],
-	},
-	{
-		slug: 'small-tools',
-		title: '我偏爱那些小工具',
-		date: '2026-05-21',
-		displayDate: '05 · 21',
-		description: '软件不一定要包办一切，解决好一个问题就很可爱。',
-		readTime: '5 分钟',
-		content: [
-			'我对功能庞大的软件总有一点本能的戒心。它们许诺管理生活的一切，最后却常常需要我先学会如何管理它们。',
-			'相比之下，小工具的边界很诚实。它可能只负责记下一句话、压缩一张图片，或者提醒我站起来走动。',
-			'边界清楚，会带来一种难得的信任感。打开它，完成一件事，然后离开。没有信息流，也没有红点在身后挽留。',
-			'也许好的产品并不是让人尽可能久地停留，而是恰好在需要的时候出现。',
-		],
-	},
-] as const;
+import type { MarkdownInstance } from 'astro';
+
+export interface PostFrontmatter {
+	title: string;
+	date: string;
+	description: string;
+	readTime: string;
+	category: '日常' | '笔记';
+}
+
+const modules = import.meta.glob<MarkdownInstance<PostFrontmatter>>(
+	'../content/posts/*.md',
+	{ eager: true },
+);
+
+export const posts = Object.entries(modules)
+	.map(([path, markdown]) => {
+		const slug = path.split('/').at(-1)?.replace(/\.md$/, '') ?? '';
+		const { title, date, description, readTime, category } = markdown.frontmatter;
+
+		return {
+			slug,
+			title,
+			date,
+			displayDate: date.slice(5).replace('-', ' · '),
+			description,
+			readTime,
+			category,
+			Content: markdown.Content,
+		};
+	})
+	.sort((a, b) => b.date.localeCompare(a.date));
