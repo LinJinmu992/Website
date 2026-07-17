@@ -16,7 +16,7 @@ const Content = post.Content;
 <Layout title={`${post.title} · 林衿慕`} description={post.description}>
 	<article class="post">
 		<header>
-			<a class="back" href="/">← 返回文章</a>
+			<a class="back" href="/articles" data-return-link>← 返回文章</a>
 			<h1>{post.title}</h1>
 			<div class="meta">
 				<time datetime={post.date}>{post.date.replaceAll('-', ' / ')}</time>
@@ -29,9 +29,33 @@ const Content = post.Content;
 		</div>
 		<footer class="post-end">
 			<span>完</span>
-			<a href="/">继续看看其他文章 →</a>
+			<a href="/articles" data-return-link>继续看看其他文章 →</a>
 		</footer>
 	</article>
+
+	<script>
+		const returnLinks = document.querySelectorAll<HTMLAnchorElement>('[data-return-link]');
+		const sourcePaths = ['/articles', '/archive'];
+		const normalizePath = (path: string) => path.replace(/\/$/, '') || '/';
+		const referrer = document.referrer ? new URL(document.referrer) : null;
+		const referrerPath = referrer?.origin === location.origin ? normalizePath(referrer.pathname) : '';
+		const sourcePath = sourcePaths.includes(referrerPath) ? referrerPath : '';
+
+		if (sourcePath) {
+			returnLinks.forEach((link) => {
+				link.href = sourcePath;
+				if (sourcePath === '/archive') {
+					link.textContent = link.classList.contains('back') ? '← 返回归档' : '继续看看归档 →';
+				}
+			});
+		}
+
+		returnLinks.forEach((link) => {
+			link.addEventListener('click', () => {
+				if (sourcePath) link.href = sourcePath;
+			});
+		});
+	</script>
 </Layout>
 
 <style>
@@ -42,7 +66,7 @@ const Content = post.Content;
 	.meta { display: flex; gap: 18px; color: var(--faint); font-size: 11px; }
 	.prose { padding: 52px 0 34px; font-family: var(--font-serif); font-size: 18px; line-height: 2.05; }
 	.prose :global(p) { margin: 0 0 1.65em; }
-	.prose :global(p:first-child::first-letter) { float: left; margin: .05em .12em 0 0; color: var(--accent); font-size: 3em; line-height: .9; }
+	.prose > :global(p:first-child::first-letter) { float: left; margin: .05em .12em 0 0; color: var(--accent); font-size: 3em; line-height: .9; }
 	.prose :global(h2),
 	.prose :global(h3) {
 		margin: 2em 0 .75em;

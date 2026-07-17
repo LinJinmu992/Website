@@ -16,6 +16,7 @@ const pathname = Astro.url.pathname;
 const nav = [
 	{ href: '/', label: '首页' },
 	{ href: '/articles', label: '文章' },
+	{ href: '/photos', label: '摄影' },
 	{ href: '/archive', label: '归档' },
 	{ href: '/about', label: '关于' },
 ];
@@ -327,7 +328,6 @@ const nav = [
 		main .lead,
 		main .section-head,
 		main .post-list article,
-		main .year,
 		main .prose,
 		main aside,
 		main .meta,
@@ -346,7 +346,6 @@ const nav = [
 		main .meta { animation-delay: .3s; }
 		main .section-head,
 		main .prose { animation-delay: .38s; }
-		main .year,
 		main aside { animation-delay: .46s; }
 		main .post-list article { animation-delay: var(--reveal-delay, .46s); }
 		main .post-end { animation-delay: .62s; }

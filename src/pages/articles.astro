@@ -9,6 +9,22 @@ const articlePosts = categories
 ---
 
 <Layout title="文章 · 林衿慕">
+	<script is:inline>
+		(() => {
+			try {
+				const raw = sessionStorage.getItem('linjinmu:articles-return');
+				if (!raw) return;
+				const state = JSON.parse(raw);
+				document.documentElement.dataset.articlesReturning = 'true';
+				if (state?.filter) {
+					document.documentElement.dataset.articleFilter = state.filter;
+				}
+			} catch {
+				document.documentElement.removeAttribute('data-articles-returning');
+				document.documentElement.removeAttribute('data-article-filter');
+			}
+		})();
+	</script>
 	<section class="articles">
 		<p class="eyebrow">Articles</p>
 		<div class="articles-head">
@@ -27,15 +43,16 @@ const articlePosts = categories
 			{articlePosts.map((post, index) => (
 				<article
 					data-category={post.category}
+					data-slug={post.slug}
 					style={`--card-delay: ${0.36 + index * 0.06}s`}
 				>
 					<div class="card-meta">
 						<span>{post.category}</span>
 						<time datetime={post.date}>{post.date.replaceAll('-', ' / ')}</time>
 					</div>
-					<h2><a href={`/posts/${post.slug}`}>{post.title}</a></h2>
+					<h2><a href={`/posts/${post.slug}`} data-article-link>{post.title}</a></h2>
 					<p>{post.description}</p>
-					<a class="card-link" href={`/posts/${post.slug}`} aria-label={`阅读《${post.title}》`}>阅读文章 ↗</a>
+					<a class="card-link" href={`/posts/${post.slug}`} data-article-link aria-label={`阅读《${post.title}》`}>阅读文章 ↗</a>
 				</article>
 			))}
 		</div>
@@ -46,23 +63,65 @@ const articlePosts = categories
 		const buttons = document.querySelectorAll<HTMLButtonElement>('[data-filter]');
 		const cards = document.querySelectorAll<HTMLElement>('[data-category]');
 		const grid = document.querySelector<HTMLElement>('.article-grid');
+		const articleLinks = document.querySelectorAll<HTMLAnchorElement>('[data-article-link]');
+		const stateKey = 'linjinmu:articles-return';
 
 		window.setTimeout(() => grid?.classList.remove('is-entering'), 1550);
 
-		buttons.forEach((button) => {
-			button.addEventListener('click', () => {
-				const filter = button.dataset.filter;
-				grid?.classList.remove('is-entering');
+		const waitForStableScroll = (callback: () => void) => {
+			window.requestAnimationFrame(() => {
+				window.requestAnimationFrame(callback);
+			});
+		};
 
-				buttons.forEach((item) => {
-					item.setAttribute('aria-pressed', String(item === button));
+		const isInViewport = (element: HTMLElement) => {
+			const rect = element.getBoundingClientRect();
+			return rect.bottom > 0 && rect.top < window.innerHeight;
+		};
+
+		const playReturnAnimation = () => {
+			if (!window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+				document.documentElement.removeAttribute('data-articles-returning');
+				document.documentElement.removeAttribute('data-article-filter');
+				return;
+			}
+
+			const visibleCards = Array.from(cards).filter((card) => !card.hidden && isInViewport(card));
+			const delayStep = 0.065;
+
+			visibleCards.forEach((card, index) => {
+				card.style.setProperty('--return-delay', `${index * delayStep}s`);
+				card.classList.remove('return-enter');
+				void card.offsetWidth;
+				card.classList.add('return-enter');
+			});
+
+			const cleanupDelay = 580 + Math.max(0, visibleCards.length - 1) * delayStep * 1000;
+			window.setTimeout(() => {
+				document.documentElement.removeAttribute('data-articles-returning');
+				document.documentElement.removeAttribute('data-article-filter');
+				window.requestAnimationFrame(() => {
+					visibleCards.forEach((card) => {
+						card.classList.remove('return-enter');
+						card.style.removeProperty('--return-delay');
+					});
 				});
+			}, cleanupDelay);
+		};
 
-				cards.forEach((card) => {
-					const visible = filter === '全部' || card.dataset.category === filter;
-					card.hidden = !visible;
-					if (visible) {
-						card.classList.remove('filter-enter');
+		const applyFilter = (filter = '全部', animate = true) => {
+			grid?.classList.remove('is-entering');
+
+			buttons.forEach((item) => {
+				item.setAttribute('aria-pressed', String(item.dataset.filter === filter));
+			});
+
+			cards.forEach((card) => {
+				const visible = filter === '全部' || card.dataset.category === filter;
+				card.hidden = !visible;
+				if (visible) {
+					card.classList.remove('filter-enter');
+					if (animate) {
 						void card.offsetWidth;
 						card.classList.add('filter-enter');
 						card.addEventListener(
@@ -71,9 +130,61 @@ const articlePosts = categories
 							{ once: true },
 						);
 					}
-				});
+				}
+			});
+		};
+
+		buttons.forEach((button) => {
+			button.addEventListener('click', () => {
+				applyFilter(button.dataset.filter);
 			});
 		});
+
+		articleLinks.forEach((link) => {
+			link.addEventListener('click', () => {
+				const card = link.closest<HTMLElement>('[data-slug]');
+				const active = Array.from(buttons).find((button) => button.getAttribute('aria-pressed') === 'true');
+				sessionStorage.setItem(
+					stateKey,
+					JSON.stringify({
+						filter: active?.dataset.filter ?? '全部',
+						slug: card?.dataset.slug,
+						scrollY: window.scrollY,
+					}),
+				);
+			});
+		});
+
+		const restoreState = () => {
+			const raw = sessionStorage.getItem(stateKey);
+			if (!raw) return;
+			sessionStorage.removeItem(stateKey);
+
+			try {
+				const state = JSON.parse(raw) as { filter?: string; slug?: string; scrollY?: number };
+				applyFilter(state.filter ?? '全部', false);
+
+				window.requestAnimationFrame(() => {
+					if (typeof state.scrollY === 'number') {
+						window.scrollTo({ top: state.scrollY, behavior: 'instant' as ScrollBehavior });
+						waitForStableScroll(playReturnAnimation);
+						return;
+					}
+
+					const target = state.slug
+						? document.querySelector<HTMLElement>(`[data-slug="${CSS.escape(state.slug)}"]`)
+						: null;
+					target?.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+					waitForStableScroll(playReturnAnimation);
+				});
+			} catch {
+				sessionStorage.removeItem(stateKey);
+				document.documentElement.removeAttribute('data-articles-returning');
+				document.documentElement.removeAttribute('data-article-filter');
+			}
+		};
+
+		restoreState();
 	</script>
 </Layout>
 
@@ -131,6 +242,24 @@ const articlePosts = categories
 		border-color: var(--faint);
 		background: var(--bg);
 	}
+	html[data-article-filter='日常'] .article-grid article:not([data-category='日常']),
+	html[data-article-filter='笔记'] .article-grid article:not([data-category='笔记']) {
+		display: none;
+	}
+	html[data-article-filter='日常'] .filters button[aria-pressed='true'],
+	html[data-article-filter='笔记'] .filters button[aria-pressed='true'] {
+		background: transparent;
+		color: var(--muted);
+	}
+	html[data-article-filter='日常'] .filters button[data-filter='日常'],
+	html[data-article-filter='笔记'] .filters button[data-filter='笔记'] {
+		background: var(--text);
+		color: var(--bg);
+	}
+	html[data-articles-returning='true'] .article-grid article {
+		opacity: 0;
+		transform: translateY(12px);
+	}
 	.article-grid article[hidden] { display: none; }
 	.card-meta {
 		display: flex;
@@ -184,6 +313,13 @@ const articlePosts = categories
 			to { opacity: 1; transform: translateY(0); }
 		}
 		.article-grid article.filter-enter { animation: filter-enter .36s cubic-bezier(.22, .72, .24, 1) both; }
+		.article-grid article.return-enter {
+			animation: article-return .52s cubic-bezier(.22, .72, .24, 1) var(--return-delay, 0s) both;
+		}
+		@keyframes article-return {
+			from { opacity: 0; transform: translateY(12px); }
+			to { opacity: 1; transform: translateY(0); }
+		}
 	}
 	@media (max-width: 680px) {
 		.articles { padding-top: 42px; }

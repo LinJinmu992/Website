@@ -1,0 +1,34 @@
+---
+import AdminShell from '../../components/admin/AdminShell.astro';
+import '../../styles/admin-photos.css';
+---
+
+<AdminShell
+	pageTitle="摄影图库 · Admin · 林衿慕"
+	eyebrow="Admin / Photos"
+	heading="摄影图库"
+	description={'这里的照片会保存到 R2 的 <code>photos/</code> 目录，并展示在摄影页面。'}
+	sectionHref="/admin"
+	sectionLabel="文章管理"
+>
+		<section class="photo-manager" data-photo-manager hidden>
+			<div class="manager-head">
+				<div>
+					<h2>摄影作品</h2>
+					<p>上传完成后，这里会显示 R2 中属于摄影图库的图片。</p>
+				</div>
+				<div class="manager-actions">
+					<label class="button upload">
+						<input type="file" accept="image/*" data-photo-image />
+						上传照片
+					</label>
+					<button class="ghost" type="button" data-refresh-photos>刷新图库</button>
+				</div>
+			</div>
+			<p class="status" data-photo-upload-status></p>
+			<div class="photo-grid" data-photo-grid>
+				<p class="empty">正在加载摄影图库…</p>
+			</div>
+		</section>
+	<script src="../../scripts/admin-photos.ts"></script>
+</AdminShell>

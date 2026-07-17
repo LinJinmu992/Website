@@ -1,0 +1,100 @@
+---
+import AdminShell from '../components/admin/AdminShell.astro';
+import '../styles/admin-posts.css';
+---
+
+<AdminShell
+	pageTitle="Admin · 林衿慕"
+	eyebrow="Admin"
+	heading="写一篇新的 blog"
+	description="一个只给你用的轻量发布界面。正文支持 Markdown，图片会上传到 R2。"
+	sectionHref="/admin/photos"
+	sectionLabel="摄影图库"
+>
+		<section class="post-manager" data-post-manager hidden>
+			<div class="manager-head">
+				<div>
+					<h2>文章管理</h2>
+					<p>可以编辑、删除已有文章，也可以新建文章。</p>
+				</div>
+				<div class="manager-actions">
+					<button class="ghost" type="button" data-refresh-posts>刷新列表</button>
+					<button type="button" data-new-post>新建文章</button>
+				</div>
+			</div>
+			<p class="status" data-manager-status></p>
+			<div class="post-admin-list" data-post-list>
+				<p class="empty">正在加载文章…</p>
+			</div>
+		</section>
+
+		<form class="editor" data-editor hidden>
+			<input name="originalSlug" type="hidden" />
+			<div class="editor-topbar">
+				<button class="back-admin" type="button" data-cancel-edit hidden>← 返回文章管理</button>
+			</div>
+			<div class="field-grid">
+				<label>
+					<span>标题</span>
+					<input name="title" required placeholder="今天想写些什么？" />
+				</label>
+				<label>
+					<span>Slug</span>
+					<input name="slug" placeholder="留空则自动生成" />
+				</label>
+				<label>
+					<span>分类</span>
+					<select name="category">
+						<option>日常</option>
+						<option>笔记</option>
+					</select>
+				</label>
+				<label>
+					<span>日期</span>
+					<input name="date" type="date" />
+				</label>
+				<label>
+					<span>阅读时间</span>
+					<input name="readTime" value="3 分钟" />
+				</label>
+			</div>
+
+			<label>
+				<span>描述</span>
+				<input name="description" required placeholder="一句话介绍这篇文章" />
+			</label>
+
+			<div class="toolbar">
+				<label class="upload">
+					<input type="file" accept="image/*" data-image />
+					上传图片到 R2
+				</label>
+				<span data-upload-status></span>
+			</div>
+
+			<section class="media-panel" aria-labelledby="media-title">
+				<div class="media-head">
+					<div>
+						<h2 id="media-title">图库</h2>
+						<p>上传过的图片会出现在这里，点击即可插入正文。</p>
+					</div>
+					<button class="ghost" type="button" data-refresh-media>刷新图库</button>
+				</div>
+				<div class="media-grid" data-media-grid>
+					<p class="empty">还没有图片。</p>
+				</div>
+			</section>
+
+			<label>
+				<span>正文 Markdown</span>
+				<textarea name="body" required placeholder="从这里开始写。支持 Markdown。"></textarea>
+			</label>
+
+			<div class="actions">
+				<button type="submit" data-submit-post>发布文章</button>
+				<button class="danger" type="button" data-delete-post hidden>删除文章</button>
+				<p class="status" data-editor-status></p>
+			</div>
+		</form>
+	<script src="../scripts/admin-posts.ts"></script>
+</AdminShell>
