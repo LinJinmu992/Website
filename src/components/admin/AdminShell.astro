@@ -1,0 +1,46 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import '../../styles/admin-common.css';
+
+interface Props {
+	pageTitle: string;
+	eyebrow: string;
+	heading: string;
+	description: string;
+	sectionHref: string;
+	sectionLabel: string;
+}
+
+const { pageTitle, eyebrow, heading, description, sectionHref, sectionLabel } = Astro.props;
+---
+
+<Layout title={pageTitle}>
+	<section class="admin-shell">
+		<p class="eyebrow">{eyebrow}</p>
+		<div class="admin-head">
+			<div>
+				<h1>{heading}</h1>
+				<p class="lead" set:html={description}></p>
+			</div>
+			<div class="head-actions">
+				<a class="button ghost" href={sectionHref}>{sectionLabel}</a>
+				<button class="ghost" type="button" data-logout hidden>退出 admin</button>
+			</div>
+		</div>
+
+		<form class="login-card" data-login>
+			<label>
+				<span>用户名</span>
+				<input name="username" autocomplete="username" required />
+			</label>
+			<label>
+				<span>密码</span>
+				<input name="password" type="password" autocomplete="current-password" required />
+			</label>
+			<button type="submit">登录</button>
+			<p class="status" data-login-status></p>
+		</form>
+
+		<slot />
+	</section>
+</Layout>

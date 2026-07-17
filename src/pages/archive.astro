@@ -4,22 +4,124 @@ import { posts } from '../data/posts';
 ---
 
 <Layout title="归档 · 林衿慕">
+	<script is:inline>
+		(() => {
+			try {
+				if (sessionStorage.getItem('linjinmu:archive-return')) {
+					document.documentElement.dataset.archiveReturning = 'true';
+				}
+			} catch {
+				document.documentElement.removeAttribute('data-archive-returning');
+			}
+		})();
+	</script>
 	<section class="archive">
 		<p class="eyebrow">Archive</p>
 		<h1>所有文章</h1>
 		<p class="lead">到目前为止，共写下 {posts.length} 篇。</p>
 		<div class="year">
 			<h2>2026</h2>
-			<ul>
-				{posts.map((post) => (
-					<li>
+			<ul class="archive-list is-entering">
+				{posts.map((post, index) => (
+					<li data-slug={post.slug} style={`--item-delay: ${0.32 + index * 0.055}s`}>
 						<time datetime={post.date}>{post.date.slice(5).replace('-', ' / ')}</time>
-						<a href={`/posts/${post.slug}`}>{post.title}</a>
+						<a href={`/posts/${post.slug}`} data-archive-link>{post.title}</a>
 					</li>
 				))}
 			</ul>
 		</div>
 	</section>
+
+	<script>
+		const archiveStateKey = 'linjinmu:archive-return';
+		const archiveLinks = document.querySelectorAll<HTMLAnchorElement>('[data-archive-link]');
+		const archiveItems = document.querySelectorAll<HTMLElement>('[data-slug]');
+
+		const waitForStableScroll = (callback: () => void) => {
+			window.requestAnimationFrame(() => {
+				window.requestAnimationFrame(callback);
+			});
+		};
+
+		const isInViewport = (element: HTMLElement) => {
+			const rect = element.getBoundingClientRect();
+			return rect.bottom > 0 && rect.top < window.innerHeight;
+		};
+
+		const playArchiveReturnAnimation = () => {
+			if (!window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+				document.documentElement.removeAttribute('data-archive-returning');
+				return;
+			}
+
+			const visibleItems = Array.from(archiveItems).filter(isInViewport);
+			const delayStep = 0.075;
+
+			visibleItems.forEach((item, index) => {
+				item.style.setProperty('--return-delay', `${index * delayStep}s`);
+				item.classList.remove('return-enter');
+				void item.offsetWidth;
+				item.classList.add('return-enter');
+			});
+
+			const cleanupDelay = 520 + Math.max(0, visibleItems.length - 1) * delayStep * 1000;
+			window.setTimeout(() => {
+				document.documentElement.removeAttribute('data-archive-returning');
+				window.requestAnimationFrame(() => {
+					visibleItems.forEach((item) => {
+						item.classList.remove('return-enter');
+						item.style.removeProperty('--return-delay');
+					});
+				});
+			}, cleanupDelay);
+		};
+
+		archiveLinks.forEach((link) => {
+			link.addEventListener('click', () => {
+				const item = link.closest<HTMLElement>('[data-slug]');
+				sessionStorage.setItem(
+					archiveStateKey,
+					JSON.stringify({
+						slug: item?.dataset.slug,
+						scrollY: window.scrollY,
+					}),
+				);
+			});
+		});
+
+		const restoreArchive = () => {
+			const raw = sessionStorage.getItem(archiveStateKey);
+			if (!raw) return;
+			sessionStorage.removeItem(archiveStateKey);
+
+			try {
+				const state = JSON.parse(raw) as { slug?: string; scrollY?: number };
+				document.querySelector('.archive-list')?.classList.remove('is-entering');
+				window.requestAnimationFrame(() => {
+					if (typeof state.scrollY === 'number') {
+						window.scrollTo({ top: state.scrollY, behavior: 'instant' as ScrollBehavior });
+						waitForStableScroll(playArchiveReturnAnimation);
+						return;
+					}
+
+					const target = state.slug
+						? document.querySelector<HTMLElement>(`[data-slug="${CSS.escape(state.slug)}"]`)
+						: null;
+					target?.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+					waitForStableScroll(playArchiveReturnAnimation);
+				});
+			} catch {
+				sessionStorage.removeItem(archiveStateKey);
+				document.documentElement.removeAttribute('data-archive-returning');
+			}
+		};
+
+		window.setTimeout(() => {
+			document.querySelector('.archive-list')?.classList.remove('is-entering');
+		}, 1400);
+
+		restoreArchive();
+	</script>
 </Layout>
 
 <style>
@@ -33,6 +135,26 @@ import { posts } from '../data/posts';
 	time { color: var(--faint); font-size: 11px; }
 	a { font-size: 15px; }
 	a:hover { color: var(--accent); }
+	html[data-archive-returning='true'] .archive-list li {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	@media (prefers-reduced-motion: no-preference) {
+		.archive-list.is-entering li {
+			animation: archive-enter .58s cubic-bezier(.22, .72, .24, 1) var(--item-delay, .32s) backwards;
+		}
+		@keyframes archive-enter {
+			from { opacity: 0; transform: translateY(9px); }
+			to { opacity: 1; transform: translateY(0); }
+		}
+		.archive-list li.return-enter {
+			animation: archive-return .46s cubic-bezier(.22, .72, .24, 1) var(--return-delay, 0s) both;
+		}
+		@keyframes archive-return {
+			from { opacity: 0; transform: translateY(10px); }
+			to { opacity: 1; transform: translateY(0); }
+		}
+	}
 	@media (max-width: 560px) {
 		.archive { padding-top: 42px; }
 		.year { grid-template-columns: 1fr; gap: 16px; }

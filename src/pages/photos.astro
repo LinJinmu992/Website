@@ -1,0 +1,70 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { photos } from '../data/photos';
+
+const formatDate = (value?: string) => {
+	if (!value) return '';
+	return new Intl.DateTimeFormat('zh-CN', {
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+	}).format(new Date(value));
+};
+import '../styles/photos.css';
+---
+
+<Layout title="摄影 · 林衿慕" description="林衿慕的摄影作品。">
+	<section class="photos-page">
+		<p class="eyebrow">Photos</p>
+		<div class="photos-head">
+			<div>
+				<h1>摄影</h1>
+				<p class="lead">把一些光、路过和安静的瞬间留在这里。</p>
+			</div>
+			<p class="count">{photos.length} 张</p>
+		</div>
+
+		{photos.length ? (
+			<div class="photo-timeline">
+				<span class="timeline-spine" aria-hidden="true"></span>
+				{photos.map((photo, index) => (
+					<article
+						class:list={['timeline-item', index % 2 === 0 ? 'is-left' : 'is-right']}
+					>
+						<span class="timeline-dot" aria-hidden="true"></span>
+						<time class="timeline-date" datetime={photo.createdAt}>
+							{photo.createdAt ? formatDate(photo.createdAt) : '未记录日期'}
+						</time>
+						<figure class="photo-card">
+							<a
+								href={photo.url}
+								data-photo-open
+								data-photo-url={photo.url}
+								data-photo-name={photo.filename}
+								aria-label={`查看 ${photo.filename}`}
+							>
+								<img src={photo.url} alt={photo.filename.replace(/\.[^.]+$/, '')} loading="lazy" />
+							</a>
+							<figcaption>{photo.filename}</figcaption>
+						</figure>
+					</article>
+				))}
+			</div>
+		) : (
+			<div class="empty-state">
+				<p>这里还没有摄影作品。</p>
+				<p>去 admin 上传第一张图，它会被保存到 R2 的 <code>photos/</code> 路径下。</p>
+			</div>
+		)}
+	</section>
+
+	<dialog class="photo-lightbox" data-photo-lightbox aria-label="照片预览">
+		<button class="lightbox-close" type="button" data-lightbox-close aria-label="关闭照片预览">×</button>
+		<div class="lightbox-content">
+			<img data-lightbox-image alt="" />
+			<p data-lightbox-caption></p>
+		</div>
+	</dialog>
+
+	<script src="../scripts/photos.ts"></script>
+</Layout>

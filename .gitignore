@@ -17,6 +17,12 @@ pnpm-debug.log*
 .env
 .env.production
 
+# private blog content and runtime data
+src/content/posts/*.md
+!src/content/posts/.gitkeep
+server/data/*.json
+server/trash/
+
 # macOS-specific files
 .DS_Store
 
