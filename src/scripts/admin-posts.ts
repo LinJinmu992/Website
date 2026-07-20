@@ -1,4 +1,4 @@
-import { adminApi as api, fileToBase64, initializeAdminSession, validateImageFile } from './admin-client';
+import { adminApi as api, initializeAdminSession, uploadImage, validateImageFile } from './admin-client';
 
 const loginForm = document.querySelector<HTMLFormElement>('[data-login]');
 const editorForm = document.querySelector<HTMLFormElement>('[data-editor]');
@@ -244,16 +244,7 @@ imageInput?.addEventListener('change', async () => {
 
 	try {
 		validateImageFile(file);
-		const data = await fileToBase64(file);
-
-		const result = await api('/admin-api/upload', {
-			method: 'POST',
-			body: JSON.stringify({
-				filename: file.name,
-				contentType: file.type,
-				data,
-			}),
-		});
+		const result = await uploadImage(file);
 		insertAtCursor(markdownForImage(result.item ?? { filename: file.name, url: result.url }));
 		await loadMedia();
 		if (uploadStatus) uploadStatus.textContent = result.reused ? '这张图已在图库中，已复用并插入正文。' : '图片已上传到图库并插入正文。';

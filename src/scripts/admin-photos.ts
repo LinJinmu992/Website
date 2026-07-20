@@ -1,4 +1,4 @@
-import { adminApi as api, escapeHtml, fileToBase64, initializeAdminSession, validateImageFile } from './admin-client';
+import { adminApi as api, escapeHtml, initializeAdminSession, uploadImage, validateImageFile } from './admin-client';
 
 const loginForm = document.querySelector<HTMLFormElement>('[data-login]');
 const loginStatus = document.querySelector<HTMLElement>('[data-login-status]');
@@ -68,17 +68,7 @@ photoImageInput?.addEventListener('change', async () => {
 
 	try {
 		validateImageFile(file);
-		const data = await fileToBase64(file);
-
-		const result = await api('/admin-api/upload', {
-			method: 'POST',
-			body: JSON.stringify({
-				filename: file.name,
-				contentType: file.type,
-				collection: 'photos',
-				data,
-			}),
-		});
+		const result = await uploadImage(file, 'photos');
 		await loadPhotos();
 		if (photoUploadStatus) {
 			photoUploadStatus.textContent = result.reused

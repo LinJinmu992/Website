@@ -108,7 +108,7 @@ const json = (res, status, body, headers = {}) => {
 	res.end(JSON.stringify(body));
 };
 
-const readJson = async (req, limit = 12 * 1024 * 1024) => {
+const readBody = async (req, limit = 12 * 1024 * 1024) => {
 	const chunks = [];
 	let size = 0;
 	for await (const chunk of req) {
@@ -121,8 +121,23 @@ const readJson = async (req, limit = 12 * 1024 * 1024) => {
 		chunks.push(chunk);
 	}
 
-	if (!chunks.length) return {};
-	return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+	return Buffer.concat(chunks);
+};
+
+const readJson = async (req, limit = 12 * 1024 * 1024) => {
+	const buffer = await readBody(req, limit);
+	if (!buffer.length) return {};
+	return JSON.parse(buffer.toString('utf8'));
+};
+
+const decodeUploadFilename = (value) => {
+	try {
+		return decodeURIComponent(String(value ?? ''));
+	} catch {
+		const error = new Error('Invalid upload filename');
+		error.statusCode = 400;
+		throw error;
+	}
 };
 
 const parseCookies = (req) => Object.fromEntries(
@@ -732,13 +747,23 @@ createServer(async (req, res) => {
 
 		if (req.method === 'POST' && url.pathname === '/admin-api/upload') {
 			if (!requireAuth(req, res)) return;
-			const body = await readJson(req, uploadBodyLimit);
-			if (!body.filename || !body.data) {
+			const requestContentType = String(req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
+			const isLegacyJsonUpload = requestContentType === 'application/json';
+			const body = isLegacyJsonUpload
+				? await readJson(req, uploadBodyLimit)
+				: {
+					filename: decodeUploadFilename(req.headers['x-upload-filename']),
+					contentType: requestContentType,
+					collection: req.headers['x-upload-collection'],
+				};
+			const buffer = isLegacyJsonUpload
+				? Buffer.from(String(body.data ?? ''), 'base64')
+				: await readBody(req, MAX_IMAGE_BYTES);
+			if (!body.filename || !buffer.length) {
 				json(res, 400, { ok: false, error: '缺少文件' });
 				return;
 			}
 
-			const buffer = Buffer.from(String(body.data), 'base64');
 			const hash = sha256(buffer);
 			const collection = normalizeMediaCollection(body.collection);
 			const optimized = await optimizeUploadedImage(buffer, { collection });
