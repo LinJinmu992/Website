@@ -72,6 +72,7 @@ services:
   backup:
     image: linjinmu-blog:${BLOG_IMAGE_TAG:-local}
     profiles: ["maintenance"]
+    network_mode: none
     user: "1000:1000"
     working_dir: /app
     env_file:
