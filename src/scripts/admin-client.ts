@@ -22,11 +22,14 @@ export const adminApi = async (path: string, options: RequestInit = {}) => {
 	return data;
 };
 
-export const fileToBase64 = (file: File) => new Promise<string>((resolve, reject) => {
-	const reader = new FileReader();
-	reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
-	reader.onerror = () => reject(reader.error);
-	reader.readAsDataURL(file);
+export const uploadImage = (file: File, collection: 'blog' | 'photos' = 'blog') => adminApi('/admin-api/upload', {
+	method: 'POST',
+	headers: {
+		'content-type': file.type || 'application/octet-stream',
+		'x-upload-filename': encodeURIComponent(file.name),
+		'x-upload-collection': collection,
+	},
+	body: file,
 });
 
 const supportedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
