@@ -41,6 +41,29 @@ test('portrait photography uploads create a 3:4 thumbnail', async () => {
 	assert.equal(result.thumbnail.height, 960);
 });
 
+test('photography thumbnails are cropped from the center', async () => {
+	const source = await sharp({
+		create: { width: 1800, height: 1200, channels: 3, background: '#00ff00' },
+	})
+		.composite([
+			{ input: { create: { width: 100, height: 1200, channels: 3, background: '#ff0000' } }, left: 0, top: 0 },
+			{ input: { create: { width: 100, height: 1200, channels: 3, background: '#0000ff' } }, left: 1700, top: 0 },
+		])
+		.png()
+		.toBuffer();
+
+	const result = await optimizeUploadedImage(source, { collection: 'photos' });
+	const edgePixels = await sharp(result.thumbnail.buffer)
+		.extract({ left: 0, top: 360, width: 960, height: 1 })
+		.raw()
+		.toBuffer();
+
+	for (let offset = 0; offset < edgePixels.length; offset += 3) {
+		assert.ok(edgePixels[offset + 1] > edgePixels[offset]);
+		assert.ok(edgePixels[offset + 1] > edgePixels[offset + 2]);
+	}
+});
+
 test('blog uploads are resized without enlargement and do not create thumbnails', async () => {
 	const source = await sharp({
 		create: { width: 3200, height: 1800, channels: 3, background: '#eeeeee' },

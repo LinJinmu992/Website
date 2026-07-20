@@ -167,13 +167,15 @@ h3 a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
 .preview-prose figure img { margin: 0 auto; }
 .preview-prose figcaption { margin-top: .6em; color: var(--faint); font-size: .78em; text-align: center; }
 .preview-prose table { display: block; max-width: 100%; overflow-x: auto; }
+.preview-prose h1,
 .preview-prose h2,
 .preview-prose h3 {
 	margin: 1.8em 0 .7em;
-	font-family: var(--font-sans);
+	font-family: var(--font-serif);
 	font-weight: 560;
 	line-height: 1.45;
 }
+.preview-prose h1 { font-size: 30px; }
 .preview-prose h2 { font-size: 21px; }
 .preview-prose h3 { font-size: 17px; }
 .preview-prose ul,

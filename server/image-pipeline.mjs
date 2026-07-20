@@ -75,7 +75,7 @@ export const optimizeUploadedImage = async (buffer, { collection = 'blog' } = {}
 				width: thumbnailWidth,
 				height: thumbnailHeight,
 				fit: 'cover',
-				position: 'attention',
+				position: 'centre',
 				withoutEnlargement: true,
 			})
 			.webp({ quality: 78, effort: 4 })
