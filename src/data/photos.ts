@@ -1,11 +1,18 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { readMediaItemsSync } from '../../server/media-store.mjs';
 
 export interface PhotoItem {
 	id: string;
+	pipelineVersion?: number;
 	filename: string;
 	url: string;
 	key: string;
+	thumbnailUrl?: string;
+	thumbnailKey?: string;
+	width?: number;
+	height?: number;
+	thumbnailWidth?: number;
+	thumbnailHeight?: number;
 	contentType?: string;
 	size?: number;
 	hash?: string;
@@ -14,18 +21,11 @@ export interface PhotoItem {
 }
 
 const mediaLibraryPath = resolve(process.cwd(), 'server/data/media-library.json');
+const mediaDatabasePath = resolve(process.cwd(), 'server/data/blog.db');
 
-const readMediaLibrary = (): PhotoItem[] => {
-	if (!existsSync(mediaLibraryPath)) return [];
-
-	try {
-		const items = JSON.parse(readFileSync(mediaLibraryPath, 'utf8'));
-		return Array.isArray(items) ? items : [];
-	} catch {
-		return [];
-	}
-};
-
-export const photos = readMediaLibrary()
-	.filter((item) => item?.collection === 'photos')
+export const photos = (readMediaItemsSync({
+	dbPath: mediaDatabasePath,
+	legacyJsonPath: mediaLibraryPath,
+	collection: 'photos',
+}) as PhotoItem[])
 	.sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));

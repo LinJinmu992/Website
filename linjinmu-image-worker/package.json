@@ -1,0 +1,14 @@
+{
+  "name": "linjinmu-image-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env-file ../.env",
+    "deploy": "wrangler deploy --env-file ../.env",
+    "test": "node --test",
+    "check": "node --check src/worker.js && node --test"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -21,7 +21,12 @@ pnpm-debug.log*
 src/content/posts/*.md
 !src/content/posts/.gitkeep
 server/data/*.json
+server/data/*.db
+server/data/*.db-*
+server/data/content-repository/
+server/backups/
 server/trash/
+.admin-tmp/
 
 # macOS-specific files
 .DS_Store

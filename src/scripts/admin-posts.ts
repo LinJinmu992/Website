@@ -1,4 +1,4 @@
-import { adminApi as api, fileToBase64, initializeAdminSession } from './admin-client';
+import { adminApi as api, fileToBase64, initializeAdminSession, validateImageFile } from './admin-client';
 
 const loginForm = document.querySelector<HTMLFormElement>('[data-login]');
 const editorForm = document.querySelector<HTMLFormElement>('[data-editor]');
@@ -71,6 +71,12 @@ const resetEditor = () => {
 	editorForm?.reset();
 	if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
 	setEditing('');
+};
+
+const gitSyncMessage = (gitSync?: { enabled?: boolean; synced?: boolean; changed?: boolean }) => {
+	if (!gitSync?.enabled) return '';
+	if (gitSync.synced) return gitSync.changed ? '已同步到 GitHub 私有仓库。' : 'GitHub 私有仓库已是最新。';
+	return '文章已保存在 VPS，但 GitHub 同步失败；请检查网络后手动同步。';
 };
 
 const fillEditor = (post: {
@@ -219,13 +225,13 @@ deletePostButton?.addEventListener('click', async () => {
 	if (!confirmed) return;
 	editorStatus.textContent = '正在删除并重新构建…';
 	try {
-		await api(`/admin-api/posts/${encodeURIComponent(originalSlug)}`, {
+		const result = await api(`/admin-api/posts/${encodeURIComponent(originalSlug)}`, {
 			method: 'DELETE',
 		});
 		resetEditor();
 		await loadPosts();
 		showPostManager();
-		if (managerStatus) managerStatus.textContent = '文章已删除。';
+		if (managerStatus) managerStatus.textContent = `文章已删除。${gitSyncMessage(result.gitSync)}`;
 	} catch (error) {
 		editorStatus.textContent = error instanceof Error ? error.message : '删除失败';
 	}
@@ -237,6 +243,7 @@ imageInput?.addEventListener('change', async () => {
 	if (uploadStatus) uploadStatus.textContent = '正在上传图片…';
 
 	try {
+		validateImageFile(file);
 		const data = await fileToBase64(file);
 
 		const result = await api('/admin-api/upload', {
@@ -275,7 +282,7 @@ editorForm?.addEventListener('submit', async (event) => {
 		await loadPosts();
 		showPostManager();
 		if (managerStatus) {
-			managerStatus.innerHTML = `${originalSlug ? '修改成功' : '发布成功'}：<a href="${result.url}" target="_blank" rel="noreferrer">${result.url}</a>。如果本地 dev 里 404，请重启 npm run dev。`;
+			managerStatus.innerHTML = `${originalSlug ? '修改成功' : '发布成功'}：<a href="${result.url}" target="_blank" rel="noreferrer">${result.url}</a>。${gitSyncMessage(result.gitSync)}如果本地 dev 里 404，请重启 npm run dev。`;
 		}
 	} catch (error) {
 		if (editorStatus) editorStatus.textContent = error instanceof Error ? error.message : '发布失败';

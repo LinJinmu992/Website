@@ -1,0 +1,6 @@
+node_modules/
+.env
+.wrangler/
+.wrangler-config/
+.wrangler-dry-run/
+worker-configuration.d.ts
