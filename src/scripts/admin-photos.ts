@@ -64,11 +64,16 @@ refreshPhotosButton?.addEventListener('click', loadPhotos);
 photoImageInput?.addEventListener('change', async () => {
 	const file = photoImageInput.files?.[0];
 	if (!file) return;
-	if (photoUploadStatus) photoUploadStatus.textContent = '正在上传照片…';
+	if (photoUploadStatus) photoUploadStatus.textContent = '正在优化照片…';
 
 	try {
 		validateImageFile(file);
-		const result = await uploadImage(file, 'photos');
+		const result = await uploadImage(file, 'photos', (percent) => {
+			if (!photoUploadStatus) return;
+			photoUploadStatus.textContent = percent < 100
+				? `正在上传照片… ${percent}%`
+				: '照片已上传，正在压缩、保存并重建页面…';
+		});
 		await loadPhotos();
 		if (photoUploadStatus) {
 			photoUploadStatus.textContent = result.reused
