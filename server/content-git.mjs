@@ -120,8 +120,10 @@ export class ContentGit {
 	async testConnection() {
 		validateContentGitConfig({ ...this.config, enabled: true }, { allowLocalRepository: this.allowLocalRepository });
 		if (this.config.sshKeyPath) await access(this.config.sshKeyPath);
+		const worktreeParent = dirname(this.config.worktree);
+		await mkdir(worktreeParent, { recursive: true });
 		await runGit(['ls-remote', this.config.repository], {
-			cwd: dirname(this.config.worktree),
+			cwd: worktreeParent,
 			config: this.config,
 		});
 		return this.publicStatus();

@@ -11,7 +11,7 @@ test('pushes complete article snapshots and restores them from a private reposit
 	t.after(() => rm(root, { recursive: true, force: true }));
 	const remote = resolve(root, 'remote.git');
 	const postsDir = resolve(root, 'posts');
-	const worktree = resolve(root, 'content-repository');
+	const worktree = resolve(root, 'runtime', 'content-repository');
 	await mkdir(postsDir, { recursive: true });
 	await runGit(['init', '--bare', remote], { cwd: root });
 
@@ -28,6 +28,7 @@ test('pushes complete article snapshots and restores them from a private reposit
 			worktree,
 		},
 	});
+	await contentGit.testConnection();
 
 	await writeFile(resolve(postsDir, 'first.md'), '# First\n', 'utf8');
 	const firstPush = await contentGit.pushSnapshot('Publish first');
