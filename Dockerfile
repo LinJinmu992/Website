@@ -11,7 +11,9 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --include=dev && npm cache clean --force
+RUN npm ci --include=dev \
+    && npm cache clean --force \
+    && chown -R node:node /app/node_modules
 
 COPY --chown=node:node . .
 
