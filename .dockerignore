@@ -1,0 +1,15 @@
+.git
+.github
+.astro
+.admin-tmp
+.env
+.env.*
+!.env.example
+dist
+node_modules
+npm-debug.log*
+src/content/posts/*.md
+server/backups
+server/data
+server/trash
+linjinmu-image-worker/node_modules
