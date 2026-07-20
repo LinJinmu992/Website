@@ -9,7 +9,8 @@ services:
     user: "1000:1000"
     working_dir: /app
     env_file:
-      - ../secrets/.env
+      - path: ../secrets/.env
+        format: raw
     environment:
       NODE_ENV: production
       ASTRO_TELEMETRY_DISABLED: "1"
@@ -74,7 +75,8 @@ services:
     user: "1000:1000"
     working_dir: /app
     env_file:
-      - ../secrets/.env
+      - path: ../secrets/.env
+        format: raw
     environment:
       BLOG_ROOT: /app
       BLOG_BACKUP_DIR: /app/server/backups
