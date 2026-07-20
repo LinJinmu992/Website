@@ -240,11 +240,16 @@ deletePostButton?.addEventListener('click', async () => {
 imageInput?.addEventListener('change', async () => {
 	const file = imageInput.files?.[0];
 	if (!file || !bodyInput) return;
-	if (uploadStatus) uploadStatus.textContent = '正在上传图片…';
+	if (uploadStatus) uploadStatus.textContent = '正在优化图片…';
 
 	try {
 		validateImageFile(file);
-		const result = await uploadImage(file);
+		const result = await uploadImage(file, 'blog', (percent) => {
+			if (!uploadStatus) return;
+			uploadStatus.textContent = percent < 100
+				? `正在上传图片… ${percent}%`
+				: '图片已上传，正在压缩并保存到 R2…';
+		});
 		insertAtCursor(markdownForImage(result.item ?? { filename: file.name, url: result.url }));
 		await loadMedia();
 		if (uploadStatus) uploadStatus.textContent = result.reused ? '这张图已在图库中，已复用并插入正文。' : '图片已上传到图库并插入正文。';
