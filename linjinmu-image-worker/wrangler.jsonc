@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "linjinmu-image-worker",
+  "main": "src/worker.js",
+  "preview_urls": false,
+  "compatibility_date": "2026-07-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "YOUR_R2_BUCKET_NAME"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "IMG_KV",
+      "id": "YOUR_KV_NAMESPACE_ID"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01
+    }
+  }
+}

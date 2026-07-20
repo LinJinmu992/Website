@@ -152,8 +152,21 @@ h3 a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
 .preview-content h2 { max-width: 480px; margin: 0 0 14px; font-size: 30px; font-weight: 500; letter-spacing: -.02em; }
 .preview-meta { display: flex; gap: 16px; color: var(--faint); font-size: 10px; }
 .preview-meta time { padding: 0; }
-.preview-prose { padding: 34px 0 18px; font-family: var(--font-serif); font-size: 16px; line-height: 2; }
+.preview-prose { min-width: 0; max-width: 100%; padding: 34px 0 18px; overflow-wrap: anywhere; font-family: var(--font-serif); font-size: 16px; line-height: 2; }
 .preview-prose p { margin: 0 0 1.4em; }
+.preview-prose img,
+.preview-prose video,
+.preview-prose iframe {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	margin: 1.6em auto;
+	border-radius: 7px;
+}
+.preview-prose figure { max-width: 100%; margin: 1.6em 0; }
+.preview-prose figure img { margin: 0 auto; }
+.preview-prose figcaption { margin-top: .6em; color: var(--faint); font-size: .78em; text-align: center; }
+.preview-prose table { display: block; max-width: 100%; overflow-x: auto; }
 .preview-prose h2,
 .preview-prose h3 {
 	margin: 1.8em 0 .7em;

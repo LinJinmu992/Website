@@ -1,6 +1,19 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { posts } from '../data/posts';
+
+let revealIndex = 0;
+const postsByYear = posts.reduce<Record<string, typeof posts>>((groups, post) => {
+	const year = post.date.slice(0, 4) || '未注明';
+	(groups[year] ??= []).push(post);
+	return groups;
+}, {});
+const archiveYears = Object.entries(postsByYear)
+	.sort(([left], [right]) => right.localeCompare(left))
+	.map(([year, yearPosts]) => ({
+		year,
+		posts: (yearPosts ?? []).map((post) => ({ post, revealIndex: revealIndex++ })),
+	}));
 ---
 
 <Layout title="归档 · 林衿慕">
@@ -19,17 +32,19 @@ import { posts } from '../data/posts';
 		<p class="eyebrow">Archive</p>
 		<h1>所有文章</h1>
 		<p class="lead">到目前为止，共写下 {posts.length} 篇。</p>
-		<div class="year">
-			<h2>2026</h2>
-			<ul class="archive-list is-entering">
-				{posts.map((post, index) => (
-					<li data-slug={post.slug} style={`--item-delay: ${0.32 + index * 0.055}s`}>
-						<time datetime={post.date}>{post.date.slice(5).replace('-', ' / ')}</time>
-						<a href={`/posts/${post.slug}`} data-archive-link>{post.title}</a>
-					</li>
-				))}
-			</ul>
-		</div>
+		{archiveYears.map(({ year, posts: yearPosts }) => (
+			<div class="year">
+				<h2>{year}</h2>
+				<ul class="archive-list is-entering">
+					{yearPosts.map(({ post, revealIndex: index }) => (
+						<li data-slug={post.slug} style={`--item-delay: ${0.32 + index * 0.055}s`}>
+							<time datetime={post.date}>{post.date.slice(5).replace('-', ' / ')}</time>
+							<a href={`/posts/${post.slug}`} data-archive-link>{post.title}</a>
+						</li>
+					))}
+				</ul>
+			</div>
+		))}
 	</section>
 
 	<script>
@@ -129,6 +144,7 @@ import { posts } from '../data/posts';
 	h1 { margin: 0; font-size: 40px; font-weight: 500; }
 	.lead { margin: 14px 0 80px; color: var(--muted); font-size: 14px; }
 	.year { display: grid; grid-template-columns: 90px 1fr; }
+	.year + .year { margin-top: 52px; }
 	h2 { margin: 3px 0 0; color: var(--faint); font-family: inherit; font-size: 12px; font-weight: 500; }
 	ul { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
 	li { display: grid; grid-template-columns: 72px 1fr; padding: 17px 0; border-bottom: 1px solid var(--line); }

@@ -1,4 +1,4 @@
-import { adminApi as api, escapeHtml, fileToBase64, initializeAdminSession } from './admin-client';
+import { adminApi as api, escapeHtml, fileToBase64, initializeAdminSession, validateImageFile } from './admin-client';
 
 const loginForm = document.querySelector<HTMLFormElement>('[data-login]');
 const loginStatus = document.querySelector<HTMLElement>('[data-login-status]');
@@ -15,7 +15,12 @@ const setAuthed = (authed: boolean) => {
 	if (logoutButton) logoutButton.hidden = !authed;
 };
 
-const renderPhotos = (items: Array<{ filename?: string; url: string; createdAt?: string }>) => {
+const renderPhotos = (items: Array<{
+	filename?: string;
+	url: string;
+	thumbnailUrl?: string;
+	createdAt?: string;
+}>) => {
 	if (!photoGrid) return;
 	if (!items.length) {
 		photoGrid.innerHTML = '<p class="empty">还没有摄影作品。</p>';
@@ -25,9 +30,10 @@ const renderPhotos = (items: Array<{ filename?: string; url: string; createdAt?:
 	photoGrid.innerHTML = items.map((item) => {
 		const filename = escapeHtml(item.filename || '未命名照片');
 		const url = escapeHtml(item.url);
+		const previewUrl = escapeHtml(item.thumbnailUrl || item.url);
 		const date = item.createdAt ? new Date(item.createdAt).toLocaleDateString('zh-CN') : '';
 		return `<a class="photo-item" href="${url}" target="_blank" rel="noreferrer">
-			<img src="${url}" alt="${filename}" loading="lazy" />
+			<img src="${previewUrl}" alt="${filename}" loading="lazy" decoding="async" />
 			<span>${filename}</span>
 			${date ? `<time>${escapeHtml(date)}</time>` : ''}
 		</a>`;
@@ -61,6 +67,7 @@ photoImageInput?.addEventListener('change', async () => {
 	if (photoUploadStatus) photoUploadStatus.textContent = '正在上传照片…';
 
 	try {
+		validateImageFile(file);
 		const data = await fileToBase64(file);
 
 		const result = await api('/admin-api/upload', {

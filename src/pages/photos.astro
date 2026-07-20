@@ -43,7 +43,14 @@ import '../styles/photos.css';
 								data-photo-name={photo.filename}
 								aria-label={`查看 ${photo.filename}`}
 							>
-								<img src={photo.url} alt={photo.filename.replace(/\.[^.]+$/, '')} loading="lazy" />
+								<img
+									src={photo.thumbnailUrl ?? photo.url}
+									alt={photo.filename.replace(/\.[^.]+$/, '')}
+									width={photo.thumbnailWidth ?? photo.width}
+									height={photo.thumbnailHeight ?? photo.height}
+									loading="lazy"
+									decoding="async"
+								/>
 							</a>
 							<figcaption>{photo.filename}</figcaption>
 						</figure>

@@ -3,12 +3,17 @@
   "type": "module",
   "version": "0.0.1",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.16.0"
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "astro dev",
     "build": "astro build",
+    "test": "node --test server/test/*.test.mjs",
+    "backup": "node scripts/backup.mjs",
+    "worker:dev": "npm --prefix linjinmu-image-worker run dev",
+    "worker:deploy": "npm --prefix linjinmu-image-worker run deploy",
+    "content:git": "node scripts/content-git.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "admin": "node server/admin-server.mjs",
@@ -17,6 +22,7 @@
   "dependencies": {
     "@fontsource-variable/noto-sans-sc": "^5.2.10",
     "@fontsource-variable/noto-serif-sc": "^5.2.10",
-    "astro": "^6.1.3"
+    "astro": "^7.1.1",
+    "sharp": "^0.35.3"
   }
 }

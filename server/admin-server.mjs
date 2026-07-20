@@ -1,9 +1,13 @@
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
-import { mkdir, readFile, readdir, rename, utimes, writeFile } from 'node:fs/promises';
-import { extname, resolve } from 'node:path';
+import { access, copyFile, cp, mkdir, readFile, readdir, rename, rm, utimes, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { promisify } from 'node:util';
+
+import { IMAGE_PIPELINE_VERSION, MAX_IMAGE_BYTES, optimizeUploadedImage } from './image-pipeline.mjs';
+import { ContentGit, getContentGitConfig } from './content-git.mjs';
+import { MediaStore } from './media-store.mjs';
 
 const scryptAsync = promisify(scrypt);
 
@@ -50,13 +54,51 @@ const photosDataFile = resolve(root, 'src/data/photos.ts');
 const serverDataDir = resolve(root, 'server/data');
 const trashPostsDir = resolve(root, 'server/trash/posts');
 const mediaLibraryFile = resolve(serverDataDir, 'media-library.json');
+const mediaDatabaseFile = resolve(serverDataDir, 'blog.db');
+const adminTmpDir = resolve(root, '.admin-tmp');
+const distDir = resolve(root, 'dist');
+const host = process.env.ADMIN_HOST ?? '127.0.0.1';
 const port = Number(process.env.ADMIN_PORT ?? 4322);
 const username = process.env.ADMIN_USERNAME;
 const passwordHash = process.env.ADMIN_PASSWORD_HASH;
 const sessionSecret = process.env.SESSION_SECRET;
 const autoBuild = process.env.BLOG_AUTO_BUILD !== 'false';
-const authDisabled = process.env.ADMIN_AUTH_DISABLED !== 'false';
-const uploadBodyLimit = 64 * 1024 * 1024;
+const authDisabled = process.env.ADMIN_AUTH_DISABLED === 'true';
+const uploadBodyLimit = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 1024 * 1024;
+const mediaStore = await MediaStore.open({
+	dbPath: mediaDatabaseFile,
+	legacyJsonPath: mediaLibraryFile,
+});
+const contentGit = new ContentGit({
+	config: getContentGitConfig({ root }),
+	postsDir,
+});
+
+let mutationQueue = Promise.resolve();
+
+const withMutationLock = (task) => {
+	const result = mutationQueue.then(task, task);
+	mutationQueue = result.catch(() => undefined);
+	return result;
+};
+
+const syncContentAfterMutation = async (message) => {
+	if (!contentGit.config.enabled) return { enabled: false, synced: false, changed: false };
+	try {
+		return await contentGit.pushSnapshot(message);
+	} catch (error) {
+		console.error(JSON.stringify({
+			message: 'Private article repository sync failed',
+			error: error instanceof Error ? error.message : String(error),
+		}));
+		return {
+			enabled: true,
+			synced: false,
+			changed: false,
+			error: error instanceof Error ? error.message : String(error),
+		};
+	}
+};
 
 const json = (res, status, body, headers = {}) => {
 	res.writeHead(status, {
@@ -206,8 +248,43 @@ const parseMarkdownPost = (slug, source) => {
 	};
 };
 
-const runBuild = () => new Promise((resolveBuild, reject) => {
-	const child = spawn('npm', ['run', 'build'], {
+const pathExists = async (path) => access(path).then(() => true, () => false);
+
+const renameWithRetry = async (source, target, attempts = 7) => {
+	let lastError;
+	for (let attempt = 1; attempt <= attempts; attempt += 1) {
+		try {
+			await rename(source, target);
+			return;
+		} catch (error) {
+			lastError = error;
+			const retryable = ['EACCES', 'EBUSY', 'EPERM'].includes(error?.code);
+			if (!retryable || attempt === attempts) throw error;
+			await new Promise((resolveRetry) => setTimeout(resolveRetry, 75 * attempt));
+		}
+	}
+	throw lastError;
+};
+
+const createTransactionDir = async (prefix) => {
+	const directory = resolve(adminTmpDir, `${prefix}-${Date.now()}-${randomBytes(6).toString('hex')}`);
+	await mkdir(directory, { recursive: true });
+	return directory;
+};
+
+const atomicWriteFile = async (target, content, options = {}) => {
+	const transactionDir = await createTransactionDir('write');
+	const temporary = resolve(transactionDir, 'next');
+	try {
+		await writeFile(temporary, content, options);
+		await rename(temporary, target);
+	} finally {
+		await rm(transactionDir, { recursive: true, force: true }).catch(() => undefined);
+	}
+};
+
+const spawnBuild = (outDir) => new Promise((resolveBuild, reject) => {
+	const child = spawn('npm', ['run', 'build', '--', '--outDir', outDir], {
 		cwd: root,
 		shell: true,
 		env: { ...process.env, ASTRO_TELEMETRY_DISABLED: '1' },
@@ -221,6 +298,41 @@ const runBuild = () => new Promise((resolveBuild, reject) => {
 		else reject(new Error(output || `Build failed with code ${code}`));
 	});
 });
+
+const runBuild = async () => {
+	const transactionDir = await createTransactionDir('build');
+	const stagedDist = resolve(transactionDir, 'dist');
+	const previousDist = resolve(transactionDir, 'previous-dist');
+	let previousMoved = false;
+
+	try {
+		const output = await spawnBuild(stagedDist);
+		if (await pathExists(distDir)) {
+			await renameWithRetry(distDir, previousDist);
+			previousMoved = true;
+		}
+
+		try {
+			try {
+				await renameWithRetry(stagedDist, distDir);
+			} catch (error) {
+				if (process.platform !== 'win32' || !['EACCES', 'EBUSY', 'EPERM'].includes(error?.code)) throw error;
+				await cp(stagedDist, distDir, { recursive: true, force: true });
+				await rm(stagedDist, { recursive: true, force: true });
+			}
+		} catch (error) {
+			await rm(distDir, { recursive: true, force: true }).catch(() => undefined);
+			if (previousMoved) {
+				await renameWithRetry(previousDist, distDir).catch(() => undefined);
+			}
+			throw error;
+		}
+
+		return output;
+	} finally {
+		await rm(transactionDir, { recursive: true, force: true }).catch(() => undefined);
+	}
+};
 
 const safePostPath = (slug) => {
 	const file = `${slugify(slug)}.md`;
@@ -274,36 +386,13 @@ const touchDevWatcher = async () => {
 
 const normalizeMediaCollection = (value) => (value === 'photos' ? 'photos' : 'blog');
 
-const readMediaLibrary = async () => {
-	try {
-		const raw = await readFile(mediaLibraryFile, 'utf8');
-		const items = JSON.parse(raw);
-		return Array.isArray(items) ? items : [];
-	} catch {
-		return [];
-	}
-};
-
-const writeMediaLibrary = async (items) => {
-	await mkdir(serverDataDir, { recursive: true });
-	await writeFile(mediaLibraryFile, JSON.stringify(items, null, 2), 'utf8');
-};
-
-const addMediaItem = async (item) => {
-	const items = await readMediaLibrary();
-	const next = [
-		item,
-		...items.filter((existing) => existing.url !== item.url),
-	].slice(0, 500);
-	await writeMediaLibrary(next);
-	return next;
-};
+const readMediaLibrary = async () => mediaStore.list();
 
 const hmac = (key, value, encoding) => createHmac('sha256', key).update(value).digest(encoding);
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const encodePath = (key) => key.split('/').map(encodeURIComponent).join('/');
 
-const uploadToR2 = async ({ filename, contentType, buffer, hash, collection }) => {
+const getR2Config = () => {
 	const {
 		R2_ACCOUNT_ID,
 		R2_ACCESS_KEY_ID,
@@ -316,14 +405,28 @@ const uploadToR2 = async ({ filename, contentType, buffer, hash, collection }) =
 		throw new Error('R2 environment variables are not configured');
 	}
 
+	return { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL };
+};
+
+const createR2Key = ({ filename, hash, collection, suffix = '' }) => {
+	const now = new Date();
+	const folder = now.toISOString().slice(0, 7).replace('-', '/');
+	const prefix = normalizeMediaCollection(collection);
+	const basename = slugify(String(filename).replace(/\.[^.]+$/, ''));
+	return `${prefix}/${folder}/${basename}-${hash.slice(0, 12)}${suffix}.webp`;
+};
+
+const requestR2 = async ({ method, key, contentType = 'application/octet-stream', buffer = Buffer.alloc(0) }) => {
+	const {
+		R2_ACCOUNT_ID,
+		R2_ACCESS_KEY_ID,
+		R2_SECRET_ACCESS_KEY,
+		R2_BUCKET,
+	} = getR2Config();
+
 	const now = new Date();
 	const date = now.toISOString().slice(0, 10).replaceAll('-', '');
 	const amzDate = `${date}T${now.toISOString().slice(11, 19).replaceAll(':', '')}Z`;
-	const folder = now.toISOString().slice(0, 7).replace('-', '/');
-	const prefix = normalizeMediaCollection(collection);
-	const extension = extname(filename).toLowerCase() || '.bin';
-	const basename = slugify(filename.replace(/\.[^.]+$/, ''));
-	const key = `${prefix}/${folder}/${basename}-${hash.slice(0, 12)}${extension}`;
 	const host = `${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 	const path = `/${R2_BUCKET}/${encodePath(key)}`;
 	const payloadHash = sha256(buffer);
@@ -335,7 +438,7 @@ const uploadToR2 = async ({ filename, contentType, buffer, hash, collection }) =
 		`x-amz-date:${amzDate}`,
 		'',
 	].join('\n');
-	const canonicalRequest = ['PUT', path, '', canonicalHeaders, signedHeaders, payloadHash].join('\n');
+	const canonicalRequest = [method, path, '', canonicalHeaders, signedHeaders, payloadHash].join('\n');
 	const credentialScope = `${date}/auto/s3/aws4_request`;
 	const stringToSign = [
 		'AWS4-HMAC-SHA256',
@@ -351,24 +454,41 @@ const uploadToR2 = async ({ filename, contentType, buffer, hash, collection }) =
 	const authorization = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
 	const response = await fetch(`https://${host}${path}`, {
-		method: 'PUT',
+		method,
 		headers: {
 			authorization,
 			'content-type': contentType,
 			'x-amz-content-sha256': payloadHash,
 			'x-amz-date': amzDate,
 		},
-		body: buffer,
+		body: method === 'DELETE' ? undefined : buffer,
 	});
 
 	if (!response.ok) {
-		throw new Error(`R2 upload failed: ${response.status} ${await response.text()}`);
+		throw new Error(`R2 ${method} failed: ${response.status} ${await response.text()}`);
 	}
+	return response;
+};
+
+const uploadToR2 = async ({ key, contentType, buffer }) => {
+	const { R2_PUBLIC_BASE_URL } = getR2Config();
+	await requestR2({ method: 'PUT', key, contentType, buffer });
 
 	return {
 		key,
 		url: `${R2_PUBLIC_BASE_URL.replace(/\/$/, '')}/${key}`,
 	};
+};
+
+const deleteFromR2 = async (key) => {
+	if (!key) return;
+	await requestR2({ method: 'DELETE', key }).catch((error) => {
+		console.error(JSON.stringify({
+			message: 'R2 cleanup failed',
+			key,
+			error: error instanceof Error ? error.message : String(error),
+		}));
+	});
 };
 
 const requireAuth = (req, res) => {
@@ -383,6 +503,31 @@ createServer(async (req, res) => {
 
 		if (req.method === 'GET' && url.pathname === '/admin-api/me') {
 			json(res, 200, { ok: true, authenticated: isAllowed(req), authDisabled, username });
+			return;
+		}
+
+		if (req.method === 'GET' && url.pathname === '/admin-api/git/status') {
+			if (!requireAuth(req, res)) return;
+			json(res, 200, { ok: true, ...contentGit.publicStatus() });
+			return;
+		}
+
+		if (req.method === 'POST' && url.pathname === '/admin-api/git/test') {
+			if (!requireAuth(req, res)) return;
+			const config = await contentGit.testConnection();
+			json(res, 200, {
+				ok: true,
+				connected: true,
+				repository: config.repository,
+				branch: config.branch,
+			});
+			return;
+		}
+
+		if (req.method === 'POST' && url.pathname === '/admin-api/git/sync') {
+			if (!requireAuth(req, res)) return;
+			const gitSync = await withMutationLock(() => contentGit.pushSnapshot('Manual blog content sync'));
+			json(res, 200, { ok: true, gitSync });
 			return;
 		}
 
@@ -448,30 +593,64 @@ createServer(async (req, res) => {
 				return;
 			}
 
-			const currentPath = safePostPath(currentSlug);
-			const nextPath = safePostPath(nextSlug);
-			await readFile(currentPath, 'utf8');
-			await writeFile(nextPath, buildMarkdown({
+			const markdown = buildMarkdown({
 				title: body.title,
 				date,
 				description: body.description,
 				readTime: body.readTime || '3 分钟',
 				category,
 				body: body.body,
-			}), 'utf8');
+			});
 
-			if (nextSlug !== currentSlug) {
-				await mkdir(trashPostsDir, { recursive: true });
-				await rename(currentPath, resolve(trashPostsDir, `${currentSlug}-${Date.now()}.md`));
-			}
+			const buildOutput = await withMutationLock(async () => {
+				const currentPath = safePostPath(currentSlug);
+				const nextPath = safePostPath(nextSlug);
+				const transactionDir = await createTransactionDir('post-update');
+				const backupPath = resolve(transactionDir, `${currentSlug}.md`);
+				await readFile(currentPath, 'utf8');
 
-			const buildOutput = await rebuildIfNeeded();
+				try {
+					if (nextSlug === currentSlug) {
+						await copyFile(currentPath, backupPath);
+						await atomicWriteFile(currentPath, markdown, 'utf8');
+						try {
+							return await rebuildIfNeeded();
+						} catch (error) {
+							await atomicWriteFile(currentPath, await readFile(backupPath));
+							throw error;
+						}
+					}
+
+					if (await pathExists(nextPath)) {
+						const error = new Error('新的 Slug 已经存在');
+						error.statusCode = 409;
+						throw error;
+					}
+
+					await atomicWriteFile(nextPath, markdown, 'utf8');
+					await rename(currentPath, backupPath);
+					try {
+						const output = await rebuildIfNeeded();
+						await mkdir(trashPostsDir, { recursive: true });
+						await rename(backupPath, resolve(trashPostsDir, `${currentSlug}-${Date.now()}.md`));
+						return output;
+					} catch (error) {
+						await rm(nextPath, { force: true }).catch(() => undefined);
+						if (await pathExists(backupPath)) await rename(backupPath, currentPath);
+						throw error;
+					}
+				} finally {
+					await rm(transactionDir, { recursive: true, force: true }).catch(() => undefined);
+				}
+			});
+			const gitSync = await withMutationLock(() => syncContentAfterMutation(`Update post: ${nextSlug}`));
 			json(res, 200, {
 				ok: true,
 				slug: nextSlug,
 				url: `/posts/${nextSlug}`,
 				built: autoBuild,
 				buildOutput,
+				gitSync,
 			});
 			return;
 		}
@@ -479,11 +658,25 @@ createServer(async (req, res) => {
 		if (postMatch && req.method === 'DELETE') {
 			if (!requireAuth(req, res)) return;
 			const slug = slugify(decodeURIComponent(postMatch[1]));
-			const source = safePostPath(slug);
-			await mkdir(trashPostsDir, { recursive: true });
-			await rename(source, resolve(trashPostsDir, `${slug}-${Date.now()}.md`));
-			const buildOutput = await rebuildIfNeeded();
-			json(res, 200, { ok: true, slug, built: autoBuild, buildOutput });
+			const buildOutput = await withMutationLock(async () => {
+				const source = safePostPath(slug);
+				const transactionDir = await createTransactionDir('post-delete');
+				const backupPath = resolve(transactionDir, `${slug}.md`);
+				await rename(source, backupPath);
+				try {
+					const output = await rebuildIfNeeded();
+					await mkdir(trashPostsDir, { recursive: true });
+					await rename(backupPath, resolve(trashPostsDir, `${slug}-${Date.now()}.md`));
+					return output;
+				} catch (error) {
+					if (await pathExists(backupPath)) await rename(backupPath, source);
+					throw error;
+				} finally {
+					await rm(transactionDir, { recursive: true, force: true }).catch(() => undefined);
+				}
+			});
+			const gitSync = await withMutationLock(() => syncContentAfterMutation(`Delete post: ${slug}`));
+			json(res, 200, { ok: true, slug, built: autoBuild, buildOutput, gitSync });
 			return;
 		}
 
@@ -499,17 +692,32 @@ createServer(async (req, res) => {
 				return;
 			}
 
-			await mkdir(postsDir, { recursive: true });
-			const target = safePostPath(slug);
-			await writeFile(target, buildMarkdown({
+			const markdown = buildMarkdown({
 				title: body.title,
 				date,
 				description: body.description,
 				readTime: body.readTime || '3 分钟',
 				category,
 				body: body.body,
-			}), { flag: 'wx' });
-			const buildOutput = await rebuildIfNeeded();
+			});
+			const target = safePostPath(slug);
+			const buildOutput = await withMutationLock(async () => {
+				await mkdir(postsDir, { recursive: true });
+				if (await pathExists(target)) {
+					const error = new Error('Slug 已经存在');
+					error.statusCode = 409;
+					throw error;
+				}
+
+				await atomicWriteFile(target, markdown, 'utf8');
+				try {
+					return await rebuildIfNeeded();
+				} catch (error) {
+					await rm(target, { force: true }).catch(() => undefined);
+					throw error;
+				}
+			});
+			const gitSync = await withMutationLock(() => syncContentAfterMutation(`Publish post: ${slug}`));
 			json(res, 201, {
 				ok: true,
 				slug,
@@ -517,6 +725,7 @@ createServer(async (req, res) => {
 				path: target,
 				built: autoBuild,
 				buildOutput,
+				gitSync,
 			});
 			return;
 		}
@@ -532,34 +741,77 @@ createServer(async (req, res) => {
 			const buffer = Buffer.from(String(body.data), 'base64');
 			const hash = sha256(buffer);
 			const collection = normalizeMediaCollection(body.collection);
-			const existing = (await readMediaLibrary())
-				.find((item) => item.hash === hash && normalizeMediaCollection(item.collection) === collection);
-			if (existing) {
-				json(res, 200, { ok: true, reused: true, item: existing, url: existing.url });
-				return;
-			}
+			const optimized = await optimizeUploadedImage(buffer, { collection });
 
-			const uploaded = await uploadToR2({
-				filename: body.filename,
-				contentType: body.contentType || 'application/octet-stream',
-				buffer,
-				hash,
-				collection,
+			const result = await withMutationLock(async () => {
+				const existing = mediaStore.findReusable(hash, collection, IMAGE_PIPELINE_VERSION);
+				if (existing) return { reused: true, item: existing, buildOutput: '' };
+
+				const fullKey = createR2Key({ filename: body.filename, hash, collection });
+				const thumbnailKey = optimized.thumbnail
+					? createR2Key({ filename: body.filename, hash, collection, suffix: '-thumb' })
+					: null;
+				let uploaded = null;
+				let thumbnail = null;
+
+				try {
+					if (optimized.thumbnail && thumbnailKey) {
+						thumbnail = await uploadToR2({
+							key: thumbnailKey,
+							contentType: optimized.thumbnail.contentType,
+							buffer: optimized.thumbnail.buffer,
+						});
+					}
+
+					uploaded = await uploadToR2({
+						key: fullKey,
+						contentType: optimized.full.contentType,
+						buffer: optimized.full.buffer,
+					});
+
+					const item = {
+						id: randomBytes(8).toString('hex'),
+						pipelineVersion: IMAGE_PIPELINE_VERSION,
+						collection,
+						filename: body.filename,
+						contentType: optimized.full.contentType,
+						size: optimized.full.size,
+						originalSize: optimized.original.size,
+						width: optimized.full.width,
+						height: optimized.full.height,
+						hash,
+						key: uploaded.key,
+						url: uploaded.url,
+						thumbnailKey: thumbnail?.key,
+						thumbnailUrl: thumbnail?.url,
+						thumbnailWidth: optimized.thumbnail?.width,
+						thumbnailHeight: optimized.thumbnail?.height,
+						createdAt: new Date().toISOString(),
+					};
+					const replacedItems = mediaStore.upsert(item);
+
+					try {
+						const buildOutput = collection === 'photos' ? await rebuildIfNeeded() : '';
+						return { reused: false, item, buildOutput };
+					} catch (error) {
+						mediaStore.rollbackUpsert(item.id, replacedItems);
+						throw error;
+					}
+				} catch (error) {
+					await deleteFromR2(uploaded?.key);
+					await deleteFromR2(thumbnail?.key);
+					throw error;
+				}
 			});
-			const item = {
-				id: randomBytes(8).toString('hex'),
-				collection,
-				filename: body.filename,
-				contentType: body.contentType || 'application/octet-stream',
-				size: buffer.length,
-				hash,
-				key: uploaded.key,
-				url: uploaded.url,
-				createdAt: new Date().toISOString(),
-			};
-			await addMediaItem(item);
-			const buildOutput = collection === 'photos' ? await rebuildIfNeeded() : '';
-			json(res, 201, { ok: true, reused: false, item, url: item.url, built: collection === 'photos' && autoBuild, buildOutput });
+
+			json(res, result.reused ? 200 : 201, {
+				ok: true,
+				reused: result.reused,
+				item: result.item,
+				url: result.item.url,
+				built: !result.reused && collection === 'photos' && autoBuild,
+				buildOutput: result.buildOutput,
+			});
 			return;
 		}
 
@@ -567,6 +819,6 @@ createServer(async (req, res) => {
 	} catch (error) {
 		json(res, error.statusCode ?? 500, { ok: false, error: error.message ?? String(error) });
 	}
-}).listen(port, () => {
-	console.log(`Admin API listening on http://127.0.0.1:${port}`);
+}).listen(port, host, () => {
+	console.log(`Admin API listening on http://${host}:${port}`);
 });

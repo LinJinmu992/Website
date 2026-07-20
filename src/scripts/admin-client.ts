@@ -29,6 +29,17 @@ export const fileToBase64 = (file: File) => new Promise<string>((resolve, reject
 	reader.readAsDataURL(file);
 });
 
+const supportedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
+
+export const validateImageFile = (file: File) => {
+	if (file.size > 45 * 1024 * 1024) {
+		throw new Error('图片过大，请上传小于 45 MB 的图片');
+	}
+	if (!supportedImageTypes.has(file.type)) {
+		throw new Error('仅支持 JPEG、PNG、WebP 和 AVIF 图片');
+	}
+};
+
 export const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({
 	'&': '&amp;',
 	'<': '&lt;',
