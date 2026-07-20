@@ -6,10 +6,10 @@ import { getContentType, getObjectKey, isAllowedReferer } from '../src/worker.js
 test('referer validation compares exact origins', () => {
   assert.equal(isAllowedReferer(new Request('https://img.example/a.jpg')), true);
   assert.equal(isAllowedReferer(new Request('https://img.example/a.jpg', {
-    headers: { Referer: 'https://example.com/photos' },
+    headers: { Referer: 'https://blog.linjinmu.com/photos' },
   })), true);
   assert.equal(isAllowedReferer(new Request('https://img.example/a.jpg', {
-    headers: { Referer: 'https://example.com.evil.example/photos' },
+    headers: { Referer: 'https://blog.linjinmu.com.evil.example/photos' },
   })), false);
   assert.equal(isAllowedReferer(new Request('https://img.example/a.jpg', {
     headers: { Referer: 'not a url' },

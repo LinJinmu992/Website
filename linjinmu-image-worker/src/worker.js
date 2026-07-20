@@ -3,8 +3,7 @@ const COUNTER_TTL_SECONDS = 48 * 60 * 60;
 const BROWSER_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
 const ALLOWED_REFERER_ORIGINS = new Set([
-  'https://example.com',
-  'https://www.example.com',
+  'https://blog.linjinmu.com',
   'http://localhost:4321',
 ]);
 

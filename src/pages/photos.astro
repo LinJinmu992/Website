@@ -10,6 +10,24 @@ const formatDate = (value?: string) => {
 		day: '2-digit',
 	}).format(new Date(value));
 };
+
+const timelinePhotos = photos.map((photo) => {
+	const width = photo.width ?? photo.thumbnailWidth ?? 4;
+	const height = photo.height ?? photo.thumbnailHeight ?? 3;
+	const orientation = height > width ? 'portrait' : (height === width ? 'square' : 'landscape');
+	const thumbnailMatchesOrientation = photo.thumbnailWidth && photo.thumbnailHeight
+		? Math.sign(photo.thumbnailWidth - photo.thumbnailHeight) === Math.sign(width - height)
+		: false;
+	const useThumbnail = Boolean(photo.thumbnailUrl && thumbnailMatchesOrientation);
+
+	return {
+		...photo,
+		displayUrl: useThumbnail ? photo.thumbnailUrl : photo.url,
+		displayWidth: useThumbnail ? photo.thumbnailWidth : photo.width,
+		displayHeight: useThumbnail ? photo.thumbnailHeight : photo.height,
+		cardRatio: orientation === 'portrait' ? '3 / 4' : (orientation === 'square' ? '1 / 1' : '4 / 3'),
+	};
+});
 import '../styles/photos.css';
 ---
 
@@ -21,13 +39,13 @@ import '../styles/photos.css';
 				<h1>摄影</h1>
 				<p class="lead">把一些光、路过和安静的瞬间留在这里。</p>
 			</div>
-			<p class="count">{photos.length} 张</p>
+			<p class="count">{timelinePhotos.length} 张</p>
 		</div>
 
-		{photos.length ? (
+		{timelinePhotos.length ? (
 			<div class="photo-timeline">
 				<span class="timeline-spine" aria-hidden="true"></span>
-				{photos.map((photo, index) => (
+				{timelinePhotos.map((photo, index) => (
 					<article
 						class:list={['timeline-item', index % 2 === 0 ? 'is-left' : 'is-right']}
 					>
@@ -38,16 +56,17 @@ import '../styles/photos.css';
 						<figure class="photo-card">
 							<a
 								href={photo.url}
+								style={`--photo-ratio: ${photo.cardRatio}`}
 								data-photo-open
 								data-photo-url={photo.url}
 								data-photo-name={photo.filename}
 								aria-label={`查看 ${photo.filename}`}
 							>
 								<img
-									src={photo.thumbnailUrl ?? photo.url}
+									src={photo.displayUrl}
 									alt={photo.filename.replace(/\.[^.]+$/, '')}
-									width={photo.thumbnailWidth ?? photo.width}
-									height={photo.thumbnailHeight ?? photo.height}
+									width={photo.displayWidth}
+									height={photo.displayHeight}
 									loading="lazy"
 									decoding="async"
 								/>

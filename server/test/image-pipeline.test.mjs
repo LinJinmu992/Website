@@ -26,6 +26,21 @@ test('photography uploads create an optimized image and a 4:3 thumbnail', async 
 	assert.equal(result.thumbnail.height, 720);
 });
 
+test('portrait photography uploads create a 3:4 thumbnail', async () => {
+	const source = await sharp({
+		create: { width: 1200, height: 1800, channels: 3, background: '#7259a8' },
+	})
+		.jpeg()
+		.toBuffer();
+
+	const result = await optimizeUploadedImage(source, { collection: 'photos' });
+
+	assert.equal(result.full.width, 1200);
+	assert.equal(result.full.height, 1800);
+	assert.equal(result.thumbnail.width, 720);
+	assert.equal(result.thumbnail.height, 960);
+});
+
 test('blog uploads are resized without enlargement and do not create thumbnails', async () => {
 	const source = await sharp({
 		create: { width: 3200, height: 1800, channels: 3, background: '#eeeeee' },

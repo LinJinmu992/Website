@@ -2,7 +2,7 @@ import sharp from 'sharp';
 
 export const MAX_IMAGE_BYTES = 45 * 1024 * 1024;
 export const MAX_IMAGE_PIXELS = 40_000_000;
-export const IMAGE_PIPELINE_VERSION = 1;
+export const IMAGE_PIPELINE_VERSION = 2;
 
 const SUPPORTED_FORMATS = new Set(['jpeg', 'png', 'webp', 'avif']);
 
@@ -61,11 +61,19 @@ export const optimizeUploadedImage = async (buffer, { collection = 'blog' } = {}
 
 	let thumbnail = null;
 	if (collection === 'photos') {
+		const swapsDimensions = [5, 6, 7, 8].includes(metadata.orientation ?? 1);
+		const orientedWidth = swapsDimensions ? metadata.height : metadata.width;
+		const orientedHeight = swapsDimensions ? metadata.width : metadata.height;
+		const isPortrait = orientedHeight > orientedWidth;
+		const isSquare = orientedHeight === orientedWidth;
+		const thumbnailWidth = isPortrait ? 720 : 960;
+		const thumbnailHeight = isPortrait ? 960 : (isSquare ? 960 : 720);
+
 		thumbnail = await openImage(buffer)
 			.rotate()
 			.resize({
-				width: 960,
-				height: 720,
+				width: thumbnailWidth,
+				height: thumbnailHeight,
 				fit: 'cover',
 				position: 'attention',
 				withoutEnlargement: true,
