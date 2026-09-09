@@ -9,7 +9,9 @@
     "dev": "node scripts/dev.mjs",
     "dev:web": "astro dev",
     "build": "astro build",
+    "build:publish": "node scripts/publish.mjs",
     "test": "node --test server/test/*.test.mjs",
+    "test:browser": "node --test tests/browser.test.mjs",
     "backup": "node scripts/backup.mjs",
     "worker:dev": "npm --prefix linjinmu-image-worker run dev",
     "worker:deploy": "npm --prefix linjinmu-image-worker run deploy",
@@ -22,7 +24,10 @@
   "dependencies": {
     "@fontsource-variable/noto-sans-sc": "^5.2.10",
     "@fontsource-variable/noto-serif-sc": "^5.2.10",
-    "astro": "^7.1.1",
-    "sharp": "^0.35.3"
+    "astro": "7.3.2",
+    "sharp": "0.35.4"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
   }
 }

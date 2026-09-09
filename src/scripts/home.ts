@@ -9,6 +9,49 @@ let previewSwitchId = 0;
 let handoffTarget: number | null = null;
 let handoffFrame = 0;
 let handoffTime = 0;
+const previewRequests = new Map<string, Promise<DocumentFragment>>();
+
+const loadPreview = async (container: HTMLElement, url: string) => {
+	const prose = container.querySelector<HTMLElement>('.preview-prose');
+	if (!prose || container.dataset.previewLoaded === 'true' || prose.getAttribute('aria-busy') === 'true') return;
+	prose.setAttribute('aria-busy', 'true');
+	prose.textContent = '正在载入正文…';
+	try {
+		let request = previewRequests.get(url);
+		if (!request) {
+			request = (async () => {
+				const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+				if (!response.ok) throw new Error('正文载入失败');
+				const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+				const content = page.querySelector('.post > .prose');
+				if (!content) throw new Error('正文载入失败');
+				// Resolve article-relative links before moving content to the homepage.
+				content.querySelectorAll('[href], [src], [poster]').forEach((element) => {
+					for (const attribute of ['href', 'src', 'poster']) {
+						const value = element.getAttribute(attribute);
+						if (value) element.setAttribute(attribute, new URL(value, response.url).href);
+					}
+				});
+				const fragment = document.createDocumentFragment();
+				fragment.append(...Array.from(content.childNodes));
+				return fragment;
+			})();
+			previewRequests.set(url, request);
+		}
+		prose.replaceChildren((await request).cloneNode(true));
+		container.dataset.previewLoaded = 'true';
+	} catch {
+		previewRequests.delete(url);
+		prose.textContent = '正文暂时无法载入。';
+		const retry = document.createElement('button');
+		retry.type = 'button';
+		retry.textContent = '重试';
+		retry.addEventListener('click', () => { void loadPreview(container, url); });
+		prose.append(' ', retry);
+	} finally {
+		prose.removeAttribute('aria-busy');
+	}
+};
 
 const stopHandoff = () => {
 	if (handoffFrame) window.cancelAnimationFrame(handoffFrame);
@@ -75,14 +118,15 @@ function closePreview() {
 
 document.querySelectorAll<HTMLAnchorElement>('[data-preview-link]').forEach((link) => {
 	link.addEventListener('click', (event) => {
-		if (!desktop.matches) return;
+		if (!desktop.matches || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
 		event.preventDefault();
 		const slug = link.dataset.previewLink;
 		if (!slug) return;
 
 		const currentPreview = document.querySelector<HTMLElement>('[data-preview-active], .preview-leave');
-		const nextPreview = document.querySelector<HTMLElement>(`[data-preview="${slug}"]`);
-		if (!nextPreview || currentPreview === nextPreview) return;
+		const nextPreview = document.querySelector<HTMLElement>(`[data-preview="${CSS.escape(slug)}"]`);
+		if (!nextPreview || (currentPreview === nextPreview && nextPreview.hasAttribute('data-preview-active'))) return;
+		void loadPreview(nextPreview, link.href);
 		const switchId = ++previewSwitchId;
 
 		document.querySelectorAll<HTMLElement>('[data-preview]').forEach((item) => {
@@ -103,7 +147,7 @@ document.querySelectorAll<HTMLAnchorElement>('[data-preview-link]').forEach((lin
 			preview?.scrollTo({ top: 0, behavior: 'smooth' });
 		};
 
-		if (currentPreview) {
+		if (currentPreview && currentPreview !== nextPreview) {
 			currentPreview.removeAttribute('data-preview-active');
 			currentPreview.classList.remove('preview-enter');
 			currentPreview.classList.add('preview-leave');

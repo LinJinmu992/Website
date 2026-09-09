@@ -1,4 +1,4 @@
-import { adminApi as api, initializeAdminSession, uploadImage, validateImageFile } from './admin-client';
+import { adminApi as api, escapeHtml, initializeAdminSession, uploadImage, validateImageFile } from './admin-client';
 
 const loginForm = document.querySelector<HTMLFormElement>('[data-login]');
 const editorForm = document.querySelector<HTMLFormElement>('[data-editor]');
@@ -117,15 +117,15 @@ const renderPosts = (posts: Array<{
 	postList.innerHTML = posts.map((post, index) => `
 		<article class="post-admin-item">
 			<div>
-				<h3>${post.title}</h3>
+				<h3>${escapeHtml(post.title)}</h3>
 				<div class="post-admin-meta">
-					<span>${post.category}</span>
-					<time>${post.date}</time>
-					<code>${post.slug}</code>
+					<span>${escapeHtml(post.category)}</span>
+					<time>${escapeHtml(post.date)}</time>
+					<code>${escapeHtml(post.slug)}</code>
 				</div>
 			</div>
 			<div class="post-admin-actions">
-				<a href="${post.url}" target="_blank" rel="noreferrer">查看</a>
+				<a href="/posts/${encodeURIComponent(post.slug)}" target="_blank" rel="noreferrer">查看</a>
 				<button class="ghost" type="button" data-edit-post="${index}">编辑</button>
 			</div>
 		</article>
@@ -154,7 +154,7 @@ const loadPosts = async () => {
 		const data = await api('/admin-api/posts');
 		renderPosts(data.posts ?? []);
 	} catch (error) {
-		postList.innerHTML = `<p class="empty">${error instanceof Error ? error.message : '文章加载失败'}</p>`;
+		postList.innerHTML = `<p class="empty">${escapeHtml(error instanceof Error ? error.message : '文章加载失败')}</p>`;
 	}
 };
 
@@ -167,8 +167,8 @@ const renderMedia = (items: Array<{ filename?: string; url: string; createdAt?: 
 
 	mediaGrid.innerHTML = items.map((item, index) => `
 		<button class="media-item" type="button" data-media-index="${index}">
-			<img src="${item.url}" alt="${item.filename || '图片'}" loading="lazy" />
-			<span>${item.filename || '未命名图片'}</span>
+			<img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.filename || '图片')}" loading="lazy" />
+			<span>${escapeHtml(item.filename || '未命名图片')}</span>
 		</button>
 	`).join('');
 
@@ -187,7 +187,7 @@ const loadMedia = async () => {
 		const data = await api('/admin-api/media?collection=blog');
 		renderMedia(data.items ?? []);
 	} catch (error) {
-		mediaGrid.innerHTML = `<p class="empty">${error instanceof Error ? error.message : '图库加载失败'}</p>`;
+		mediaGrid.innerHTML = `<p class="empty">${escapeHtml(error instanceof Error ? error.message : '图库加载失败')}</p>`;
 	}
 };
 
@@ -278,7 +278,8 @@ editorForm?.addEventListener('submit', async (event) => {
 		await loadPosts();
 		showPostManager();
 		if (managerStatus) {
-			managerStatus.innerHTML = `${originalSlug ? '修改成功' : '发布成功'}：<a href="${result.url}" target="_blank" rel="noreferrer">${result.url}</a>。${gitSyncMessage(result.gitSync)}如果本地 dev 里 404，请重启 npm run dev。`;
+			const url = `/posts/${encodeURIComponent(result.slug)}`;
+			managerStatus.innerHTML = `${originalSlug ? '修改成功' : '发布成功'}：<a href="${url}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>。${gitSyncMessage(result.gitSync)}`;
 		}
 	} catch (error) {
 		if (editorStatus) editorStatus.textContent = error instanceof Error ? error.message : '发布失败';

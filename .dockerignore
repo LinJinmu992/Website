@@ -2,6 +2,10 @@
 .github
 .astro
 .admin-tmp
+**/.admin-tmp
+runtime
+src/content/.posts-restore-*
+src/content/.posts-previous-*
 .env
 .env.*
 !.env.example

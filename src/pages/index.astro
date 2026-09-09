@@ -48,24 +48,21 @@ import '../styles/home.css';
 
 			<aside class="article-preview" aria-live="polite">
 				<button class="preview-close" type="button" aria-label="关闭文章预览">×</button>
-				{recentPosts.map((post) => {
-					const Content = post.Content;
-					return (
-						<article class="preview-content" data-preview={post.slug} hidden>
-							<p class="preview-kicker">Reading now</p>
-							<h2>{post.title}</h2>
-							<div class="preview-meta">
-								<time datetime={post.date}>{post.date.replaceAll('-', ' / ')}</time>
-								<span>{post.category}</span>
-								<span>{post.readTime}阅读</span>
-							</div>
-							<div class="preview-prose">
-								<Content />
-							</div>
-							<a class="open-page" href={`/posts/${post.slug}`}>在独立页面阅读 →</a>
-						</article>
-					);
-				})}
+				{recentPosts.map((post) => (
+					<article class="preview-content" data-preview={post.slug} hidden>
+						<p class="preview-kicker">Reading now</p>
+						<h2>{post.title}</h2>
+						<div class="preview-meta">
+							<time datetime={post.date}>{post.date.replaceAll('-', ' / ')}</time>
+							<span>{post.category}</span>
+							<span>{post.readTime}阅读</span>
+						</div>
+						<div class="preview-prose">
+							<p>点击文章后载入正文。</p>
+						</div>
+						<a class="open-page" href={`/posts/${post.slug}`}>在独立页面阅读 →</a>
+					</article>
+				))}
 			</aside>
 		</div>
 	</section>

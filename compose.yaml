@@ -15,6 +15,7 @@ services:
       NODE_ENV: production
       ASTRO_TELEMETRY_DISABLED: "1"
       BLOG_ROOT: /app
+      BLOG_DIST_DIR: /app/runtime/dist
       ADMIN_HOST: 127.0.0.1
       ADMIN_PORT: "4322"
       ADMIN_AUTH_DISABLED: "false"
@@ -22,8 +23,11 @@ services:
       CONTENT_GIT_WORKTREE: /app/server/data/content-repository
       BLOG_BACKUP_DIR: /app/server/backups
     volumes:
-      - ./:/app
-      - blog_node_modules:/app/node_modules
+      - ./src/content:/app/src/content
+      - ./server/data:/app/server/data
+      - ./server/backups:/app/server/backups
+      - ./server/trash:/app/server/trash
+      - ./runtime:/app/runtime
       - ../secrets/linjinmu_blog_github:/home/node/.ssh/linjinmu_blog_github:ro
       - ../secrets/known_hosts:/home/node/.ssh/known_hosts:ro
     networks:
@@ -54,7 +58,7 @@ services:
     user: "101:101"
     read_only: true
     volumes:
-      - ./:/app:ro
+      - ./runtime:/app/runtime:ro
       - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
     tmpfs:
       - /tmp:size=64m,mode=1777
@@ -82,16 +86,13 @@ services:
       BLOG_ROOT: /app
       BLOG_BACKUP_DIR: /app/server/backups
     volumes:
-      - ./:/app
-      - blog_node_modules:/app/node_modules
+      - ./server/data:/app/server/data
+      - ./server/backups:/app/server/backups
     command: ["npm", "run", "backup"]
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-
-volumes:
-  blog_node_modules:
 
 networks:
   npm-network:
