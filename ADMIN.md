@@ -41,13 +41,13 @@ BLOG_ROOT=/path/to/your/blog
 openssl rand -base64 48
 ```
 
-当前开发版默认禁用密码登录。如果以后想恢复密码登录，设置：
+默认启用密码登录。必须配置用户名、密码哈希和 Session Secret；生产 Compose 强制保持：
 
 ```bash
 ADMIN_AUTH_DISABLED=false
 ```
 
-无密码模式会直接允许访问发布接口，只建议在本地、内网、或 Nginx 已经额外做了访问限制的情况下使用。
+仅在本地开发时，可以显式设置 `ADMIN_AUTH_DISABLED=true`。该模式直接允许访问发布接口，不能用于公网。
 
 ## 3. R2 图片上传环境变量
 
@@ -82,7 +82,7 @@ server/data/blog.db
 - 只接受 JPEG、PNG、WebP 和 AVIF，最大 45 MB
 - 自动按 EXIF 方向旋转，但不会保留 EXIF、GPS 等元数据
 - 博客正文图最长边限制为 2400px，并转换为 WebP
-- 摄影作品最长边限制为 3200px，并额外生成 960×720 的时间轴缩略图
+- 摄影作品最长边限制为 3200px；横图生成 960×720、竖图生成 720×960、方图生成 960×960 的居中裁剪缩略图，小图不放大
 - 原始文件不会上传到 R2
 
 旧图库中的图片不会自动改写；在 Admin 中重新上传同一原文件时，会用新管线替换对应图库记录。
@@ -93,17 +93,13 @@ server/data/blog.db
 npm run admin
 ```
 
-建议用 `systemd` 或 `pm2` 在 VPS 上常驻运行。
+VPS 使用 Docker Compose 常驻运行，步骤见 `DEPLOY_VPS.md`。
 
-本地开发时需要开两个终端：
+本地开发只需一个终端，`npm run dev` 会同时启动 Astro 和 Admin API：
 
 ```powershell
-# 终端 1：博客页面
 $env:ASTRO_TELEMETRY_DISABLED='1'
 npm run dev
-
-# 终端 2：Admin API，当前默认无密码模式
-npm run admin
 ```
 
 Astro dev 已经配置了 `/admin-api` 代理，会把请求转到 `http://127.0.0.1:4322`。
@@ -142,9 +138,11 @@ location /admin-api/ {
 
 1. 串行执行文章和图库变更，避免并发构建互相覆盖
 2. 原子写入 `src/content/posts/{slug}.md`
-3. 把网站构建到 `.admin-tmp/` 临时目录
+3. 把网站构建到输出目录同级的 `.admin-tmp/` 临时目录，验证首页产物存在
 4. 构建成功后整体替换 `dist`
-5. 构建失败时恢复文章和图库数据，继续保留原来的 `dist`
+5. 构建失败时恢复文章和图库数据，继续保留原来的 `dist`；如果自动恢复也失败，保留旧产物并返回恢复目录，禁止自动删除该目录
+
+Docker 中输出目录为 `/app/runtime/dist`，暂存目录为 `/app/runtime/.admin-tmp`。文章事务使用 `src/content/.admin-tmp`，失败事务保留用于恢复，确认内容完整后再手动清理。
 
 如果暂时不想每次发布后自动构建，可以设置：
 
@@ -175,7 +173,7 @@ server/trash/posts/
 CONTENT_GIT_ENABLED=true
 CONTENT_GIT_REPOSITORY=git@github.com:OWNER/Blog_text.git
 CONTENT_GIT_BRANCH=main
-CONTENT_GIT_SSH_KEY_PATH=/root/.ssh/linjinmu_blog_github
+CONTENT_GIT_SSH_KEY_PATH=/home/blog/.ssh/linjinmu_blog_github
 CONTENT_GIT_AUTHOR_NAME=LinJinmu
 CONTENT_GIT_AUTHOR_EMAIL=你的GitHub邮箱
 CONTENT_GIT_WORKTREE=server/data/content-repository

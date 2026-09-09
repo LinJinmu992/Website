@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { MediaStore } from '../media-store.mjs';
+import { MediaStore, readMediaItemsSync } from '../media-store.mjs';
 
 test('migrates the legacy JSON library and keeps replacements transactional', async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'linjinmu-media-'));
@@ -35,4 +35,40 @@ test('migrates the legacy JSON library and keeps replacements transactional', as
 		store.close();
 		await rm(directory, { recursive: true, force: true });
 	}
+});
+
+for (const invalid of ['{invalid', '{}', '[{"id":"incomplete"}]']) {
+	test(`failed legacy migration remains retryable: ${invalid}`, async () => {
+		const directory = await mkdtemp(join(tmpdir(), 'linjinmu-migration-'));
+		const options = { dbPath: join(directory, 'blog.db'), legacyJsonPath: join(directory, 'legacy.json') };
+		try {
+			await writeFile(options.legacyJsonPath, invalid);
+			if (invalid !== '[{"id":"incomplete"}]') assert.throws(() => readMediaItemsSync(options));
+			await assert.rejects(MediaStore.open(options));
+			await writeFile(options.legacyJsonPath, JSON.stringify([{
+				id: 'restored', filename: 'restored.jpg', key: 'photos/restored.jpg',
+				url: 'https://example.test/restored.jpg', collection: 'photos',
+			}]));
+			const store = await MediaStore.open(options);
+			try { assert.deepEqual(store.list().map((item) => item.id), ['restored']); }
+			finally { store.close(); }
+		} finally { await rm(directory, { recursive: true, force: true }); }
+	});
+}
+
+test('missing legacy files can be restored later and read errors are surfaced', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'linjinmu-migration-'));
+	const options = { dbPath: join(directory, 'blog.db'), legacyJsonPath: join(directory, 'legacy.json') };
+	try {
+		const fresh = await MediaStore.open(options);
+		assert.equal(fresh.list().length, 0);
+		fresh.close();
+		await mkdir(options.legacyJsonPath);
+		await assert.rejects(MediaStore.open(options));
+		await rm(options.legacyJsonPath, { recursive: true });
+		await writeFile(options.legacyJsonPath, '[]');
+		const repaired = await MediaStore.open(options);
+		assert.ok(repaired.statements.getMeta.get('legacy_json_migrated'));
+		repaired.close();
+	} finally { await rm(directory, { recursive: true, force: true }); }
 });

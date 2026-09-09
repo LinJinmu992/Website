@@ -11,13 +11,13 @@
   └─ Cloudflare DNS / Access
        └─ Nginx Proxy Manager :443
             └─ npm-network → linjinmu-blog:8080
-                 ├─ 内部 Nginx → /app/dist
+                 ├─ 内部 Nginx → /app/runtime/dist
                  └─ /admin-api/* → 127.0.0.1:4322
 
 blog-app
   ├─ Admin API        → 仅监听 127.0.0.1:4322
   ├─ Markdown         → /app/src/content/posts/
-  ├─ 自动构建         → /app/.admin-tmp/ → /app/dist/
+  ├─ 自动构建         → /app/runtime/.admin-tmp/ → /app/runtime/dist/
   ├─ 私有文章快照     → GitHub 私有文章仓库
   ├─ 图片上传         → R2 S3 API
   └─ 图库元数据       → /app/server/data/blog.db
@@ -35,7 +35,7 @@ blog-app
 | 图库元数据 | VPS `server/data/blog.db` | 否 |
 | 生产环境变量 | VPS `/srv/linjinmu-blog/secrets/.env` | 否 |
 | GitHub Deploy Key | VPS `/srv/linjinmu-blog/secrets/` | 否 |
-| 构建产物 | VPS `dist/` | 否 |
+| 构建产物 | VPS `runtime/dist/` | 否 |
 
 Cloudflare Worker 已独立部署并正常运行时，不要仅因迁移或更新 VPS 而重新部署 Worker。
 
@@ -94,6 +94,15 @@ sudo -u blog git clone --branch master --single-branch \
   https://github.com/OWNER/FRAMEWORK_REPOSITORY.git \
   /srv/linjinmu-blog/app
 ```
+
+先创建由服务用户持有的数据目录，避免 Docker 自动创建为 root：
+
+```bash
+cd /srv/linjinmu-blog/app
+sudo install -d -m 0755 -o blog -g blog src/content src/content/posts server/data server/backups server/trash runtime
+```
+
+应用代码和 `node_modules` 来自镜像，不挂载整个 `/app` 或依赖卷。只挂载上述业务数据目录；文章挂载其父目录 `src/content`，构建产物挂载其父目录 `runtime`，确保暂存与目标位于相同文件系统。Nginx 只读挂载 `runtime`。更新依赖时，重建镜像并重建容器即可使用新依赖。
 
 不得把本地 `node_modules/`、`dist/`、`.env`、文章或数据库复制进公开仓库或 Docker 构建上下文。
 
@@ -167,6 +176,7 @@ Compose 会强制覆盖以下容器内安全值：
 
 ```text
 BLOG_ROOT=/app
+BLOG_DIST_DIR=/app/runtime/dist
 ADMIN_HOST=127.0.0.1
 ADMIN_PORT=4322
 ADMIN_AUTH_DISABLED=false
@@ -216,8 +226,8 @@ docker compose run --rm blog-app npm run content:git -- pull
 
 ```bash
 docker compose run --rm blog-app npm test
-docker compose run --rm blog-app npm run build
-test -f dist/index.html
+docker compose run --rm blog-app npm run build:publish
+test -f runtime/dist/index.html
 ```
 
 只有测试和构建全部成功后才能启动生产容器。
@@ -320,7 +330,7 @@ https://BLOG_DOMAIN
 ```bash
 cd /srv/linjinmu-blog/app
 docker compose run --rm blog-app npm test
-docker compose run --rm blog-app npm run build
+docker compose run --rm blog-app npm run build:publish
 docker compose run --rm blog-app npm run content:git -- test
 docker compose ps
 curl -I https://BLOG_DOMAIN/
@@ -372,7 +382,7 @@ OLD_COMMIT="$(git rev-parse HEAD)"
 docker compose --profile maintenance run --rm backup
 
 sudo install -d -m 0750 -o blog -g blog /srv/linjinmu-blog/rollback
-sudo cp -a dist "/srv/linjinmu-blog/rollback/dist-${OLD_COMMIT}"
+sudo cp -a runtime/dist "/srv/linjinmu-blog/rollback/dist-${OLD_COMMIT}"
 sudo chown -R blog:blog "/srv/linjinmu-blog/rollback/dist-${OLD_COMMIT}"
 ```
 
@@ -383,7 +393,7 @@ git pull --ff-only
 docker compose build blog-app
 docker compose run --rm blog-app npm run content:git -- test
 docker compose run --rm blog-app npm test
-docker compose run --rm blog-app npm run build
+docker compose run --rm blog-app npm run build:publish
 ```
 
 保留新镜像标签并切换：
@@ -396,6 +406,12 @@ docker compose ps
 ```
 
 只有 Worker 代码或绑定发生变化时才部署 Worker。普通博客框架更新不要重复部署 Worker。
+
+### 从旧版整仓挂载升级
+
+旧版产物位于宿主机 `dist/`，新配置使用 `runtime/dist/`。第一次升级前先备份 SQLite、文章和旧 dist，记录旧提交及旧镜像标签。创建上文的数据目录后，在新镜像内运行测试和 `npm run build:publish`，检查 `runtime/dist/index.html` 存在，再重建两个服务。此时旧容器仍使用旧的 `dist/`；旧目录和旧依赖卷暂时保留，验收成功前不要删除。升级期间暂停后台写入，避免测试构建与正在发布的文章互相干扰。
+
+新挂载配置的代码来自镜像，回滚需使用对应旧镜像及该版本的 Compose/Nginx 配置。回滚到整仓挂载版本时恢复宿主机 `dist/`，不要误将新路径套用到旧配置。
 
 ## 14. 回滚
 
@@ -414,11 +430,11 @@ docker compose stop blog-app blog-web
 git switch --detach KNOWN_GOOD_COMMIT
 docker compose build blog-app
 docker compose run --rm blog-app npm test
-docker compose run --rm blog-app npm run build
+docker compose run --rm blog-app npm run build:publish
 docker compose up -d --force-recreate blog-app blog-web
 ```
 
-如果新构建失败，可将 `/srv/linjinmu-blog/rollback/dist-KNOWN_GOOD_COMMIT` 恢复为 `dist`，并使用保留的 `linjinmu-blog:KNOWN_GOOD_SHORT_COMMIT` 镜像。不要使用 `git reset --hard`。
+如果新构建失败，可将 `/srv/linjinmu-blog/rollback/dist-KNOWN_GOOD_COMMIT` 恢复为 `runtime/dist`，并使用保留的 `linjinmu-blog:KNOWN_GOOD_SHORT_COMMIT` 镜像。不要使用 `git reset --hard`。
 
 恢复文章前先复制当前 `src/content/posts/`，再运行 `content:git -- pull`。恢复 SQLite 时先停止 `blog-app`，替换 `server/data/blog.db`，确认所有者为 `blog` 后再启动。
 

@@ -112,10 +112,15 @@ export class MediaStore {
 	static async open({ dbPath, legacyJsonPath }) {
 		await mkdir(dirname(dbPath), { recursive: true });
 		const database = new DatabaseSync(dbPath);
-		createSchema(database);
-		const store = new MediaStore(database, dbPath);
-		await store.migrateLegacyJson(legacyJsonPath);
-		return store;
+		try {
+			createSchema(database);
+			const store = new MediaStore(database, dbPath);
+			await store.migrateLegacyJson(legacyJsonPath);
+			return store;
+		} catch (error) {
+			database.close();
+			throw error;
+		}
 	}
 
 	constructor(database, dbPath) {
@@ -129,9 +134,12 @@ export class MediaStore {
 		let items = [];
 		try {
 			const parsed = JSON.parse(await readFile(legacyJsonPath, 'utf8'));
-			if (Array.isArray(parsed)) items = parsed;
-		} catch {
-			// A missing legacy file is a valid fresh installation.
+			if (!Array.isArray(parsed)) throw new Error('旧图库 JSON 必须是数组');
+			items = parsed;
+		} catch (error) {
+			// Leave migration pending so a subsequently restored file can be imported.
+			if (error.code === 'ENOENT') return;
+			throw error;
 		}
 
 		if (Number(this.statements.count.get().count) === 0 && items.length) {
@@ -217,12 +225,7 @@ export const readMediaItemsSync = ({ dbPath, legacyJsonPath, collection }) => {
 	}
 
 	if (!existsSync(legacyJsonPath)) return [];
-	try {
-		const items = JSON.parse(readFileSync(legacyJsonPath, 'utf8'));
-		return Array.isArray(items)
-			? items.filter((item) => !collection || item.collection === collection)
-			: [];
-	} catch {
-		return [];
-	}
+	const items = JSON.parse(readFileSync(legacyJsonPath, 'utf8'));
+	if (!Array.isArray(items)) throw new Error('旧图库 JSON 必须是数组');
+	return items.filter((item) => !collection || item.collection === collection);
 };

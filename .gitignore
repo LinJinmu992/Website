@@ -27,6 +27,9 @@ server/data/content-repository/
 server/backups/
 server/trash/
 .admin-tmp/
+runtime/
+src/content/.posts-restore-*/
+src/content/.posts-previous-*/
 
 # macOS-specific files
 .DS_Store

@@ -2,6 +2,7 @@
 
 图库元数据保存在 `server/data/blog.db`。首次启动 Admin 时，如果检测到旧的
 `server/data/media-library.json`，会自动迁移到 SQLite；旧 JSON 不会自动删除。
+JSON 格式或读取权限错误会使启动失败，修复文件后重试；只有成功读取并处理后才写入迁移标记。文件不存在时保持待迁移状态。
 
 执行一次备份：
 

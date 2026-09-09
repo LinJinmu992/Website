@@ -17,6 +17,9 @@ RUN npm ci --include=dev \
 
 COPY --chown=node:node . .
 
+# Astro creates its build cache under /app; no source bind mount supplies ownership.
+RUN chown node:node /app
+
 USER node
 
 EXPOSE 4322

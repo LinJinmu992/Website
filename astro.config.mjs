@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
+	outDir: process.env.BLOG_DIST_DIR || './dist',
 	vite: {
 		server: {
 			proxy: {
